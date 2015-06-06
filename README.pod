@@ -4,10 +4,7 @@ The minimal stuff needed from Bytes::Random::Secure, with no dependencies.
 
 =head1 Description
 
-The CPAN Module L<Bytes::Random::Secure> produces high quality randomness using the ISAAC algorithm, seeded using
-entropy sources on a wide variety of operating systems.  It has quite a few options for configurability.  And
-provides both a functions and an object interface.  But it has several dependencies, and its configurability,
-flexible and useful, may be more complexity than most use-cases require.
+The CPAN Module L<Bytes::Random::Secure> produces high quality pseudo-randomness using the ISAAC cryptographically secure pseudo-random number generation algorithm, seeded using cryptographically secure entropy sources on a wide variety of operating systems.  It has quite a few options for configurability.  And provides both a functions and an object interface.  But it has several dependencies, and its configurability and its user-interface, while flexible and useful, may expose more complexity than most use-cases require.
 
 Bytes::Random::Secure::Tiny's goal is to have no dependencies outside of the Perl core, and for the most part,
 a simple interface that presents a minimal amount of configuration.  We essentially asked ourselves, what
