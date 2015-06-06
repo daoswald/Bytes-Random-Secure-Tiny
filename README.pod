@@ -1,4 +1,5 @@
 =head1 Bytes-Random-Secure-Tiny
+
 The minimal stuff needed from Bytes::Random::Secure, with no dependencies.
 
 =head1 Description
