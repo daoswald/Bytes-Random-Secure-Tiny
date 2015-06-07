@@ -40,7 +40,7 @@ sub bytes {
   $bytes  = defined $bytes ? int abs $bytes : 0; # Default 0, coerce to UINT.
   my $str = q{};
   while ($bytes >= 4) {                  # Utilize irand()'s 32 bits.
-    $str .= pack("L", $self->_rng->irand);
+    $str .= pack("L", $self->{'_rng'}->irand);
     $bytes -= 4;
   }
   if ($bytes > 0) { # Handle 16b and 8b respectively.
