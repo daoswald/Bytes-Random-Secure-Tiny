@@ -8,53 +8,55 @@ use 5.006000;
 use Carp;
 use Math::Random::ISAAC;
 use Crypt::Random::Seed;
+use Hash::Util;
+use XXX;
 
 our $VERSION = '0.01';
 
-# Seed size: 512 bits; 16 32-bit integers.
 # See Math::Random::ISAAC https://rt.cpan.org/Public/Bug/Display.html?id=64324
-use constant SEED_SIZE => 512/32;       # bits/words = num_words.
-my $_RNG = undef; # RNG is a singleton, constructed on first use, shared.
+use constant SEED_SIZE => 256;       # bits; eight 32-bit words.
 
-sub new {bless {}, shift}
-sub irand {shift->_rng->irand}
-sub bytes_hex {unpack 'H*', shift->bytes(shift)} # Hex digits only, no '0x'
-
-sub _rng {
-    # Get a list of 16, 32-bit unsigned longs.
-    return $_RNG ||= Math::Random::ISAAC->new(do{
-        my $source = Crypt::Random::Seed->new(Weak=>0, NonBlocking=>1)
-            || die 'Could not get a seed source.';
-        $source->random_values(SEED_SIZE);
-    });
+sub new {
+    my($self, $class, $bits) = ({}, @_);
+    $bits ||= SEED_SIZE;  # This will be eight 32-bit words.
+    die "Number of bits must be 64 <= n <= 8192, and a multipe in 2^n: $bits"
+        if $bits < 64 || $bits > 8192 || !ispowerof2($bits);
+    return Hash::Util::lock_hashref bless {
+        bits => $bits,
+        _rng => Math::Random::ISAAC->new(do{
+            my $source = Crypt::Random::Seed->new(Weak=>0, NonBlocking=>1)
+                || die 'Could not get a seed source.';
+            $source->random_values($bits/32);
+        }),
+    }, shift;
 }
+
+sub ispowerof2 { my $n = shift; return ($n >= 0) && (($n & ($n-1)) ==0 ) }
+sub irand {shift->{'_rng'}->irand}
+sub bytes_hex {unpack 'H*', shift->bytes(shift)} # Hex digits only, no '0x'
 
 sub bytes {
   my($self, $bytes) = @_;
-  # Default to 0 bytes. Coerce non-ints and negatives to a non-negative int.
-  $bytes  = defined $bytes ? int abs $bytes : 0;
-
+  $bytes  = defined $bytes ? int abs $bytes : 0; # Default 0, coerce to UINT.
   my $str = q{};
   while ($bytes >= 4) {                  # Utilize irand()'s 32 bits.
     $str .= pack("L", $self->_rng->irand);
     $bytes -= 4;
   }
-
-  if ($bytes > 0) {
-    $str .= pack("S", ($self->_rng->irand >> 8) & 0xFFFF) if $bytes >= 2; # 16b
-    $str .= pack("C", $self->_rng->irand & 0xFF) if $bytes % 2;           # 8b
+  if ($bytes > 0) { # Handle 16b and 8b respectively.
+    $str .= pack("S", ($self->{'_rng'}->irand >> 8) & 0xFFFF) if $bytes >= 2;
+    $str .= pack("C", $self->{'_rng'}->irand & 0xFF) if $bytes % 2;
   }
   return $str;
 }
 
 sub string_from {
   my($self, $bag, $bytes) = @_;
-  $bag = defined $bag ? $bag : '';
+  $bag = defined $bag ? $bag : q{};
   $bytes = defined $bytes ? int abs $bytes : 0;
   my $range = length $bag;
   croak 'Bag size must be at least one character.' unless $range;
-
-  my $rand_bytes = q{}; # We need an empty (and defined) string.
+  my $rand_bytes = q{}; # We need an empty, defined string.
   $rand_bytes .= substr $bag, $_, 1 for $self->_ranged_randoms($range, $bytes);
   return $rand_bytes;
 }
@@ -63,7 +65,7 @@ sub _ranged_randoms {
     my ($self, $range, $count) = @_;
     $_ = defined $_ ? $_ : 0 for $count, $range;
     croak "$range exceeds irand max limit of 2^^32." if $range > 2**32;
- 
+
     # Find nearest factor of 2**32 >= $range.
     my $divisor = do {
         my ($n, $d) = (0,0);
@@ -72,13 +74,12 @@ sub _ranged_randoms {
     };
 
     my @randoms;
-    $#randoms = $count - 1;  # Pre-extend, then purge; microoptimization.
-    @randoms = ();
+    $#randoms = $count-1; @randoms = (); # Microoptimize: Preextend & purge.
 
     for my $n (1 .. $count) {
-        my $rand;
+        my $rand = $self->{'_rng'}->irand % $divisor;
         # Roll, re-roll if random number is out of bag's range (no modbias).
-        $rand = $self->_rng->irand % $divisor while $rand >= $range;
+        $rand = $self->_rng->{'irand'} % $divisor while $rand >= $range;
         push @randoms, $rand;
     }
     return @randoms;
