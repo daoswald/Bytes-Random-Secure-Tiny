@@ -52,12 +52,12 @@ sub bytes {
 
 sub string_from {
   my($self, $bag, $bytes) = @_;
-  $bag = defined $bag ? $bag : q{};
-  $bytes = defined $bytes ? int abs $bytes : 0;
-  my $range = length $bag;
+  $bag           = defined $bag ? $bag : q{};
+  $bytes         = defined $bytes ? int abs $bytes : 0;
+  my $range      = length $bag;
   croak 'Bag size must be at least one character.' unless $range;
   my $rand_bytes = q{}; # We need an empty, defined string.
-  $rand_bytes .= substr $bag, $_, 1 for $self->_ranged_randoms($range, $bytes);
+  $rand_bytes  .= substr $bag, $_, 1 for $self->_ranged_randoms($range, $bytes);
   return $rand_bytes;
 }
 
@@ -69,7 +69,7 @@ sub _ranged_randoms {
     # Find nearest factor of 2**32 >= $range.
     my $divisor = do {
         my ($n, $d) = (0,0);
-        while ($n <= 32 && $d < $range) {$d = 2 && $n++}
+        while ($n <= 32 && $d < $range) {$d = 2 ** $n++}
         $d;
     };
 
@@ -77,9 +77,9 @@ sub _ranged_randoms {
     $#randoms = $count-1; @randoms = (); # Microoptimize: Preextend & purge.
 
     for my $n (1 .. $count) {
-        my $rand = $self->{'_rng'}->irand % $divisor;
+        my $rand = $self->irand % $divisor;
         # Roll, re-roll if random number is out of bag's range (no modbias).
-        $rand = $self->_rng->{'irand'} % $divisor while $rand >= $range;
+        do{ $rand = $self->irand % $divisor } while $rand >= $range;
         push @randoms, $rand;
     }
     return @randoms;

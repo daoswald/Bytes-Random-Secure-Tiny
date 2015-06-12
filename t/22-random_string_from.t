@@ -31,13 +31,14 @@ while( ( $min > 0 || $max < 199 ) && $tries++ < $MAX_TRIES ) {
 }
 is( $min, 0, '_ranged_randoms generates range minimum.' );
 is( $max, 199, '_ranged_randoms generates range maximum.' );
-note "It took $tries tries to hit both min and max.";
+if( $min > 0 || $max < 199 ) { diag "Range error: \$min was $min, \$max was $max" }
+else { note "It took $tries tries to hit both min and max." }
 
 # Testing random_string_from().
 
 is( $random->string_from( 'abc', 0 ), '',
     'string_from() with a quantity of zero returns empty string.' );
-    
+
 is( $random->string_from( 'abc' ), '',
     'string_from() with an undefined quantity defaults to zero.' );
 
