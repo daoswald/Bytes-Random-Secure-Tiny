@@ -5,6 +5,9 @@ use warnings;
 
 use Test::More;
 
+$Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
+$ENV{'BRST_DEBUG'} = 1;
+
 eval "use Statistics::Basic;"; ## no critic (eval)
 if ( $@ ) {
   plan( skip_all => "Statistics::Basic needed for random quality tests." );

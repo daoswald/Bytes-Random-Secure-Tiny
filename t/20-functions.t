@@ -8,6 +8,7 @@ use Bytes::Random::Secure::Tiny;
 
 use 5.006000;
 
+$Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
 my @methods = qw/ bytes bytes_hex string_from /;
 
 

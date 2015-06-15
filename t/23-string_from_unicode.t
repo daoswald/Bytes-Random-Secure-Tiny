@@ -7,6 +7,9 @@ use Test::More;
 
 use Bytes::Random::Secure::Tiny;
 
+$Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
+$ENV{'BRST_DEBUG'} = 1;
+
 if( ! $^V ||  $^V lt v5.8.9 ) {
   plan skip_all =>
     'Cannot reliably test Unicode support on Perl\'s older than 5.8.9.';

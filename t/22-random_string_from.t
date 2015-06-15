@@ -7,6 +7,9 @@ use Test::More;
 
 use Bytes::Random::Secure::Tiny;
 
+$Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
+$ENV{'BRST_DEBUG'} = 1;
+
 # We'll use a weaker source because we're testing for function, quality
 # isn't being contested here.
 my $random = Bytes::Random::Secure::Tiny->new(64);
@@ -31,8 +34,11 @@ while( ( $min > 0 || $max < 199 ) && $tries++ < $MAX_TRIES ) {
 }
 is( $min, 0, '_ranged_randoms generates range minimum.' );
 is( $max, 199, '_ranged_randoms generates range maximum.' );
-if( $min > 0 || $max < 199 ) { diag "Range error: \$min was $min, \$max was $max" }
-else { note "It took $tries tries to hit both min and max." }
+if( $min > 0 || $max < 199 ) {
+    fail "Range error: \$min was $min, \$max was $max" }
+else {
+    pass "It took $tries tries to hit both min and max."
+}
 
 # Testing random_string_from().
 

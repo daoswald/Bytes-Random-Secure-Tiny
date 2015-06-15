@@ -1,29 +1,245 @@
 ## no critic (constant,unpack)
 
+package Math::Random::ISAAC::PP::Embedded;
+
+# ABSTRACT: Pure Perl port of the ISAAC PRNG algorithm
+
+use strict;
+use warnings;
+use Carp ();
+
+our $VERSION = '1.004';
+
+sub new {
+    my ($class, @seed) = @_;
+    my $seedsize = scalar(@seed);
+    my @mm;
+
+    $#mm = $#seed = 255;                # predeclare arrays with 256 slots
+    $seed[$_] = 0 for $seedsize .. 255; # Zero-fill unused seed space.
+
+    my $self = {
+        randrsl => \@seed,    randcnt => 0,     randmem => \@mm,
+        randa   => 0,         randb   => 0,     randc   => 0,
+    };
+
+    bless($self, $class);
+    $self->_randinit();
+    return $self;
+}
+
+## no critic (ProhibitBuiltinHomonyms)
+
+sub irand {
+  my ($self) = @_;
+
+  # Reset the sequence if we run out of random stuff
+  if (!$self->{randcnt}--)
+  {
+    _isaac($self);
+    $self->{randcnt} = 255;
+  }
+
+  return sprintf('%u', $self->{randrsl}->[$self->{randcnt}]);
+}
+
+## no critic (ProhibitCStyleForLoops)
+## no critic (RequireNumberSeparators)
+
+sub _isaac {
+  my ($self) = @_;
+  use integer;
+
+  my $mm = $self->{randmem};
+  my $r = $self->{randrsl};
+
+  # $a and $b are reserved (see 'sort')
+  my $aa = $self->{randa};
+  my $bb = ($self->{randb} + (++$self->{randc})) & 0xffffffff;
+
+  my ($x, $y); # temporary storage
+
+  # The C code deals with two halves of the randmem separately; we deal with
+  # it here in one loop, by adding the &0xff parts. These calls represent the
+  # rngstep() macro, but it's inlined here for speed.
+  for (my $i = 0; $i < 256; $i += 4)
+  {
+    $x = $mm->[$i  ];
+    $aa = (($aa ^ ($aa << 13)) + $mm->[($i   + 128) & 0xff]);
+    $aa &= 0xffffffff; # Mask out high bits for 64-bit systems
+    $mm->[$i  ] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+    $r->[$i  ] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+
+    # I don't actually know why the "0x03ffffff" stuff is for. It was in
+    # John L. Allen's code. If you can explain this please file a bug report.
+    $x = $mm->[$i+1];
+    $aa = (($aa ^ (0x03ffffff & ($aa >> 6))) + $mm->[($i+1+128) & 0xff]);
+    $aa &= 0xffffffff;
+    $mm->[$i+1] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+    $r->[$i+1] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+
+    $x = $mm->[$i+2];
+    $aa = (($aa ^ ($aa << 2)) + $mm->[($i+2 + 128) & 0xff]);
+    $aa &= 0xffffffff;
+    $mm->[$i+2] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+    $r->[$i+2] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+
+    $x = $mm->[$i+3];
+    $aa = (($aa ^ (0x0000ffff & ($aa >> 16))) + $mm->[($i+3 + 128) & 0xff]);
+    $aa &= 0xffffffff;
+    $mm->[$i+3] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+    $r->[$i+3] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+  }
+
+  @{$self}{qw/randb randa/} = ($bb,$aa);
+  return;
+}
+
+sub _randinit
+{
+  my ($self) = @_;
+  use integer;
+
+  # $a and $b are reserved (see 'sort'); $i is the iterator
+  my ($c, $d, $e, $f, $g, $h, $j, $k) = (0x9e3779b9)x8; # The golden ratio.
+
+  my $mm = $self->{randmem};
+  my $r = $self->{randrsl};
+
+  for (1..4)
+  {
+    $c ^= $d << 11;                     $f += $c;       $d += $e;
+    $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
+    $e ^= $f << 8;                      $h += $e;       $f += $g;
+    $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
+    $g ^= $h << 10;                     $k += $g;       $h += $j;
+    $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
+    $j ^= $k << 8;                      $d += $j;       $k += $c;
+    $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
+  }
+
+  for (my $i = 0; $i < 256; $i += 8)
+  {
+    $c += $r->[$i  ];   $d += $r->[$i+1];
+    $e += $r->[$i+2];   $f += $r->[$i+3];
+    $g += $r->[$i+4];   $h += $r->[$i+5];
+    $j += $r->[$i+6];   $k += $r->[$i+7];
+
+    $c ^= $d << 11;                     $f += $c;       $d += $e;
+    $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
+    $e ^= $f << 8;                      $h += $e;       $f += $g;
+    $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
+    $g ^= $h << 10;                     $k += $g;       $h += $j;
+    $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
+    $j ^= $k << 8;                      $d += $j;       $k += $c;
+    $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
+
+    $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
+    $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
+    $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
+    $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
+  }
+
+  for (my $i = 0; $i < 256; $i += 8)
+  {
+    $c += $mm->[$i  ];  $d += $mm->[$i+1];
+    $e += $mm->[$i+2];  $f += $mm->[$i+3];
+    $g += $mm->[$i+4];  $h += $mm->[$i+5];
+    $j += $mm->[$i+6];  $k += $mm->[$i+7];
+
+    $c ^= $d << 11;                     $f += $c;       $d += $e;
+    $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
+    $e ^= $f << 8;                      $h += $e;       $f += $g;
+    $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
+    $g ^= $h << 10;                     $k += $g;       $h += $j;
+    $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
+    $j ^= $k << 8;                      $d += $j;       $k += $c;
+    $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
+
+    $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
+    $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
+    $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
+    $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
+  }
+
+  $self->_isaac();
+  $self->{randcnt} = 256;
+
+  return;
+}
+
+1;
+
+package Math::Random::ISAAC::Embedded;
+
+use strict;
+use warnings;
+use Carp ();
+
+our $VERSION = '1.004';
+
+my %CSPRNG = (
+    XS  => 'Math::Random::ISAAC::XS',
+    PP  => 'Math::Random::ISAAC::PP',
+    EM  => 'Math::Random::ISAAC::PP::Embedded',
+);
+
+# Wrappers around the actual methods
+sub new {
+    my ($class, @seed) = @_;
+    Carp::croak('You must call this as a class method') if ref($class);
+
+    our $EMBEDDED_CSPRNG =
+        defined $EMBEDDED_CSPRNG             ? $EMBEDDED_CSPRNG             :
+        defined $ENV{'BRST_EMBEDDED_CSPRNG'} ? $ENV{'BRST_EMBEDDED_CSPRNG'} : 0;
+
+    my $DRIVER =
+        $EMBEDDED_CSPRNG                          ? $CSPRNG{'EM'} :
+        eval {require Math::Random::ISAAC::XS; 1} ? $CSPRNG{'XS'} :
+        eval {require Math::Random::ISAAC::PP; 1} ? $CSPRNG{'PP'} :
+                                                    $CSPRNG{'EM'};
+    Carp::carp("Using backend $DRIVER\n")
+        if $EMBEDDED_CSPRNG && $ENV{'BRST_DEBUG'};
+
+    return bless { '_backend' => $DRIVER->new(@seed) }, $class;
+}
+
+## no critic (ProhibitBuiltinHomonyms)
+
+sub irand {
+  my ($self) = @_;
+  Carp::croak('You must call this method as an object') unless ref($self);
+  return $self->{_backend}->irand();
+}
+
+1;
+
 package Bytes::Random::Secure::Tiny;
 
 use strict;
 use warnings;
 use 5.006000;
 use Carp;
-use Math::Random::ISAAC;
+#use Math::Random::ISAAC::Embeded;
 use Crypt::Random::Seed;
-use Hash::Util;
-use XXX;
+use Hash::Util; # We lock internal hash to prevent post-instantiation manip.
 
 our $VERSION = '0.01';
 
 # See Math::Random::ISAAC https://rt.cpan.org/Public/Bug/Display.html?id=64324
-use constant SEED_SIZE => 256;       # bits; eight 32-bit words.
+use constant SEED_SIZE => 256; # bits; eight 32-bit words.
 
+# Contrary to previous strategies of lazy-seeding / prng-instantiation, we
+# instantiate the RNG on object instantiation, and lock the internal hash
+# so that others cannot change it once instantiated.
 sub new {
     my($self, $class, $bits) = ({}, @_);
     $bits ||= SEED_SIZE;  # This will be eight 32-bit words.
     die "Number of bits must be 64 <= n <= 8192, and a multipe in 2^n: $bits"
-        if $bits < 64 || $bits > 8192 || !ispowerof2($bits);
+        if $bits < 64 || $bits > 8192 || !_ispowerof2($bits);
     return Hash::Util::lock_hashref bless {
         bits => $bits,
-        _rng => Math::Random::ISAAC->new(do{
+        _rng => Math::Random::ISAAC::Embedded->new(do{
             my $source = Crypt::Random::Seed->new(Weak=>0, NonBlocking=>1)
                 || die 'Could not get a seed source.';
             $source->random_values($bits/32);
@@ -31,21 +247,21 @@ sub new {
     }, shift;
 }
 
-sub ispowerof2 { my $n = shift; return ($n >= 0) && (($n & ($n-1)) ==0 ) }
-sub irand {shift->{'_rng'}->irand}
-sub bytes_hex {unpack 'H*', shift->bytes(shift)} # Hex digits only, no '0x'
+sub _ispowerof2 {my $n = shift; return ($n >= 0) && (($n & ($n-1)) ==0 )}
+sub irand {shift->{'_rng'}->irand} # public API, and consumed internally.
+sub bytes_hex {unpack 'H*', shift->bytes(shift)} # lc Hex digits only, no '0x'
 
 sub bytes {
   my($self, $bytes) = @_;
   $bytes  = defined $bytes ? int abs $bytes : 0; # Default 0, coerce to UINT.
   my $str = q{};
   while ($bytes >= 4) {                  # Utilize irand()'s 32 bits.
-    $str .= pack("L", $self->{'_rng'}->irand);
+    $str .= pack("L", $self->irand);
     $bytes -= 4;
   }
   if ($bytes > 0) { # Handle 16b and 8b respectively.
-    $str .= pack("S", ($self->{'_rng'}->irand >> 8) & 0xFFFF) if $bytes >= 2;
-    $str .= pack("C", $self->{'_rng'}->irand & 0xFF) if $bytes % 2;
+    $str .= pack("S", ($self->irand >> 8) & 0xFFFF) if $bytes >= 2;
+    $str .= pack("C", $self->irand & 0xFF) if $bytes % 2;
   }
   return $str;
 }
@@ -76,10 +292,9 @@ sub _ranged_randoms {
     my @randoms;
     $#randoms = $count-1; @randoms = (); # Microoptimize: Preextend & purge.
 
-    for my $n (1 .. $count) {
+    for my $n (1 .. $count) { # re-roll if r-num is out of bag range (modbias)
         my $rand = $self->irand % $divisor;
-        # Roll, re-roll if random number is out of bag's range (no modbias).
-        do{ $rand = $self->irand % $divisor } while $rand >= $range;
+        $rand    = $self->irand % $divisor while $rand >= $range;
         push @randoms, $rand;
     }
     return @randoms;
@@ -401,3 +616,4 @@ by the Free Software Foundation; or the Artistic License.
 See http://dev.perl.org/licenses/ for more information.
 
 =cut
+
