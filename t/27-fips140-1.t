@@ -37,6 +37,9 @@ use Test::More;
 use Bytes::Random::Secure::Tiny qw();
 use Time::HiRes qw/gettimeofday/;
 
+$Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
+$ENV{'BRST_DEBUG'} = 1;
+
 my $random = Bytes::Random::Secure::Tiny->new(128);
 
 plan tests => 2 + 2 + 2 + 24 + 2;
