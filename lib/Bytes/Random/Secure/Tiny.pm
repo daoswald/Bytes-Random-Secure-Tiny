@@ -1,3 +1,258 @@
+# --------------------------------------------------------- #
+# Crypt::Random::Seed::Embedded, taken with consent from    #
+# Crypt::Random::Seed, by Dana Jacobson.                    #
+# --------------------------------------------------------- #
+
+package Crypt::Random::Seed::Embedded;
+use strict;
+use warnings;
+use Fcntl;
+use Carp qw/carp croak/;
+
+# cert insists on using constant, but regular critic doesn't like it.
+## no critic (constant)
+
+our $VERSION = '0.03';
+use constant UINT32_SIZE => 4;
+
+# These are the pre-defined names.  We don't let user methods use these.
+my %defined_methods = map { $_ => 1 }
+  qw(CryptGenRandom RtlGenRand EGD /dev/random /dev/urandom);
+
+# If given one of these names as whitelist/blacklist, we add these also.
+my %name_aliases = ('Win32'  => [qw(RtlGenRand CryptGenRandom)]);
+
+sub new {
+  my ($class, %params) = @_;
+  my $self = {};
+
+  if (defined $params{Source}) {
+    if (ref($params{Source}) eq 'CODE') {
+      $self->{Name}      = 'User';
+      $self->{SourceSub} = $params{Source};
+      $self->{Blocking}  = 0;
+      $self->{Strong}    = 0;
+    } elsif (ref($params{Source}) eq 'ARRAY') {
+      ($self->{Name}, $self->{SourceSub}, $self->{Blocking}, $self->{Strong})
+        = @{$params{Source}};
+      # For sanity, don't let them redefine the standard names.
+      croak "Invalid name: $self->{Name}.  Name reserved."
+        if defined $defined_methods{$self->{Name}};
+    } else {
+      croak "Invalid 'Source'.  Should be code or array reference.";
+    }
+  } else {
+    # This is a sorted list -- the first one that returns true gets used.
+    my @methodlist = (
+       \&_try_win32,
+       \&_try_egd,
+       \&_try_dev_random,
+       \&_try_dev_urandom,
+    );
+
+    my %whitelist;
+    my $have_whitelist = 0;
+    if (defined $params{Only}) {
+      croak "Parameter 'Only' must be an array ref" unless ref($params{Only}) eq 'ARRAY';
+      $have_whitelist = 1;
+      $whitelist{$_} = 1 for @{$params{Only}};
+      while ( my($name, $list) = each %name_aliases) {
+        @whitelist{@$list} = (1) x scalar @$list if $whitelist{$name};
+      }
+    }
+    my %blacklist;
+    if (defined $params{Never}) {
+      croak "Parameter 'Never' must be an array ref" unless ref($params{Never}) eq 'ARRAY';
+      $blacklist{$_} = 1 for @{$params{Never}};
+      while ( my($name, $list) = each %name_aliases) {
+        @blacklist{@$list} = (1) x scalar @$list if $blacklist{$name};
+      }
+    }
+
+    foreach my $m (@methodlist) {
+      my ($name, $rsub, $isblocking, $isstrong) = $m->();
+      next unless defined $name;
+      next if $isblocking &&
+        ($params{NonBlocking} || $params{Nonblocking} || $params{nonblocking});
+      next if $blacklist{$name};
+      next if $have_whitelist && !$whitelist{$name};
+      $self->{Name}      = $name;
+      $self->{SourceSub} = $rsub;
+      $self->{Blocking}  = $isblocking;
+      $self->{Strong}    = $isstrong;
+      last;
+    }
+  }
+  # Couldn't find anything appropriate
+  return unless defined $self->{SourceSub};
+  bless $self, $class;
+  return $self;
+}
+
+sub random_values {
+  my ($self, $nvalues) = @_;
+  return unless defined $nvalues && int($nvalues) > 0;
+  my $rsub = $self->{SourceSub};
+  return unless defined $rsub;
+  return unpack( 'L*', $rsub->(UINT32_SIZE * int($nvalues)) );
+}
+
+sub _try_dev_urandom {
+  return unless -r "/dev/urandom";
+  return ('/dev/urandom', sub { __read_file('/dev/urandom', @_); }, 0, 0);
+}
+
+sub _try_dev_random {
+  return unless -r "/dev/random";
+  # FreeBSD's /dev/random is 256-bit Yarrow non-blocking.
+  # Is it 'strong'?  Debatable -- we'll say it is.
+  my $blocking = ($^O eq 'freebsd') ? 0 : 1;
+  return ('/dev/random', sub { __read_file('/dev/random', @_); }, $blocking, 1);
+}
+
+sub __read_file {
+  my ($file, $nbytes) = @_;
+  return unless defined $nbytes && $nbytes > 0;
+  sysopen(my $fh, $file, O_RDONLY);
+  binmode $fh;
+  my($s, $buffer, $nread) = ('', '', 0);
+  while ($nread < $nbytes) {
+    my $thisread = sysread $fh, $buffer, $nbytes-$nread;
+    # Count EOF as an error.
+    croak "Error reading $file: $!\n" unless defined $thisread && $thisread > 0;
+    $s .= $buffer;
+    $nread += length($buffer);
+    #die unless $nread == length($s);  # assert
+  }
+  croak "Internal file read error: wanted $nbytes, read $nread"
+      unless $nbytes == length($s);  # assert
+  return $s;
+}
+
+sub _try_win32 {
+  return unless $^O eq 'MSWin32';
+  # Cygwin has /dev/random at least as far back as 2000.
+  eval { require Win32; require Win32::API; require Win32::API::Type; 1; }
+  or return;
+
+  use constant CRYPT_SILENT      => 0x40;       # Never display a UI.
+  use constant PROV_RSA_FULL     => 1;          # Which service provider.
+  use constant VERIFY_CONTEXT    => 0xF0000000; # Don't need existing keypairs.
+  use constant W2K_MAJOR_VERSION => 5;          # Windows 2000
+  use constant W2K_MINOR_VERSION => 0;
+
+  my ($major, $minor) = (Win32::GetOSVersion())[1, 2];
+  return if $major < W2K_MAJOR_VERSION;
+
+  if ($major == W2K_MAJOR_VERSION && $minor == W2K_MINOR_VERSION) {
+    # We are Windows 2000.  Use the older CryptGenRandom interface.
+    my $crypt_acquire_context_a =
+              Win32::API->new( 'advapi32', 'CryptAcquireContextA', 'PPPNN',
+                'I' );
+    return unless defined $crypt_acquire_context_a;
+    my $context = chr(0) x Win32::API::Type->sizeof('PULONG');
+    my $result = $crypt_acquire_context_a->Call(
+             $context, 0, 0, PROV_RSA_FULL, CRYPT_SILENT | VERIFY_CONTEXT );
+    return unless $result;
+    my $pack_type = Win32::API::Type::packing('PULONG');
+    $context = unpack $pack_type, $context;
+    my $crypt_gen_random =
+              Win32::API->new( 'advapi32', 'CryptGenRandom', 'NNP', 'I' );
+    return unless defined $crypt_gen_random;
+    return ('CryptGenRandom',
+            sub {
+              my $nbytes = shift;
+              my $buffer = chr(0) x $nbytes;
+              my $result = $crypt_gen_random->Call($context, $nbytes, $buffer);
+              croak "CryptGenRandom failed: $^E" unless $result;
+              return $buffer;
+            },
+            0, 1);  # Assume non-blocking and strong
+  } else {
+    my $rtlgenrand = Win32::API->new( 'advapi32', <<'_RTLGENRANDOM_PROTO_');
+INT SystemFunction036(
+  PVOID RandomBuffer,
+  ULONG RandomBufferLength
+)
+_RTLGENRANDOM_PROTO_
+    return unless defined $rtlgenrand;
+    return ('RtlGenRand',
+            sub {
+              my $nbytes = shift;
+              my $buffer = chr(0) x $nbytes;
+              my $result = $rtlgenrand->Call($buffer, $nbytes);
+              croak "RtlGenRand failed: $^E" unless $result;
+              return $buffer;
+            },
+            0, 1);  # Assume non-blocking and strong
+  }
+  return;
+}
+
+sub _try_egd {
+  # For locations, we'll look in the files OpenSSL's RAND_egd looks, as well
+  # as /etc/entropy which egd 0.9 recommends.  This also works with PRNGD.
+  # PRNGD uses a seed+CSPRNG so is non-blocking, but we can't tell them apart.
+  foreach my $device (qw( /var/run/egd-pool /dev/egd-pool /etc/egd-pool /etc/entropy )) {
+    next unless -r $device && -S $device;
+    eval { require IO::Socket; 1; } or return;
+    # We're looking for a socket that returns the entropy available when given
+    # that command.  Set timeout to 1 to prevent hanging -- if it is a socket
+    # but won't return the available entropy in under a second, move on.
+    my $socket = IO::Socket::UNIX->new(Peer => $device, Timeout => 1);
+    next unless $socket;
+    $socket->syswrite( pack("C", 0x00), 1) or next;
+    die if $socket->error;
+    my($entropy_string, $nread);
+    # Sadly this doesn't honor the timeout.  We'll have to do an eval / alarm.
+    # We only timeout here if this is a live socket to a sleeping process.
+    eval {
+      local $SIG{ALRM} = sub { die "alarm\n" };
+      alarm 1;
+      $nread = $socket->sysread($entropy_string, 4);
+      alarm 0;
+    };
+    if ($@) {
+      die unless $@ eq "alarm\n";
+      next;
+    }
+    next unless defined $nread && $nread == 4;
+    my $entropy_avail = unpack("N", $entropy_string);
+    return ('EGD', sub { __read_egd($device, @_); }, 1, 1);
+  }
+  return;
+}
+
+sub __read_egd {
+  my ($device, $nbytes) = @_;
+  return unless defined $device;
+  return unless defined $nbytes && int($nbytes) > 0;
+  croak "$device doesn't exist!" unless -r $device && -S $device;
+  my $socket = IO::Socket::UNIX->new(Peer => $device);
+  croak "Can't talk to EGD on $device. $!" unless $socket;
+  my($s, $buffer, $toread) = ('', '', $nbytes);
+  while ($toread > 0) {
+    my $this_request = ($toread > 255) ? 255 : $toread;
+    # Use the blocking interface.
+    $socket->syswrite( pack("CC", 0x02, $this_request), 2);
+    my $this_grant = $socket->sysread($buffer, $this_request);
+    croak "Error reading EDG data from $device: $!\n"
+          unless defined $this_grant && $this_grant == $this_request;
+    $s .= $buffer;
+    $toread -= length($buffer);
+  }
+  croak "Internal EGD read error: wanted $nbytes, read ", length($s), ""
+      unless $nbytes == length($s);  # assert
+  return $s;
+}
+
+1;
+
+# ------------------------------------------------------------ #
+# Math::Random::ISAAC::PP::Embedded: Taken without notice from #
+# Math::Random::ISAAC and Math::Random::ISAAC::PP.             #
+# ------------------------------------------------------------ #
+
 ## no critic (constant,unpack)
 
 package Math::Random::ISAAC::PP::Embedded;
@@ -8,7 +263,7 @@ use strict;
 use warnings;
 use Carp ();
 
-our $VERSION = '1.004';
+our $VERSION = '1.004'; # IE, based on the CPAN version by similar name.
 
 sub new {
     my ($class, @seed) = @_;
@@ -31,141 +286,131 @@ sub new {
 ## no critic (ProhibitBuiltinHomonyms)
 
 sub irand {
-  my ($self) = @_;
+    my ($self) = @_;
 
-  # Reset the sequence if we run out of random stuff
-  if (!$self->{randcnt}--)
-  {
-    _isaac($self);
-    $self->{randcnt} = 255;
-  }
-
-  return sprintf('%u', $self->{randrsl}->[$self->{randcnt}]);
+    # Reset the sequence if we run out of random stuff
+    if (!$self->{randcnt}--) {
+        _isaac($self);
+        $self->{randcnt} = 255;
+    }
+    return sprintf('%u', $self->{randrsl}->[$self->{randcnt}]);
 }
 
 ## no critic (ProhibitCStyleForLoops)
 ## no critic (RequireNumberSeparators)
 
 sub _isaac {
-  my ($self) = @_;
-  use integer;
+    my ($self) = @_;
+    use integer;
 
-  my $mm = $self->{randmem};
-  my $r = $self->{randrsl};
+    my $mm = $self->{randmem};
+    my $r  = $self->{randrsl};
+    # $a and $b are reserved (see 'sort')
+    my $aa = $self->{randa};
+    my $bb = ($self->{randb} + (++$self->{randc})) & 0xffffffff;
+    my ($x, $y); # temporary storage
 
-  # $a and $b are reserved (see 'sort')
-  my $aa = $self->{randa};
-  my $bb = ($self->{randb} + (++$self->{randc})) & 0xffffffff;
+    # The C code deals with two halves of the randmem separately; we deal with
+    # it here in one loop, by adding the &0xff parts. These calls represent the
+    # rngstep() macro, but it's inlined here for speed.
+    for (my $i = 0; $i < 256; $i += 4) {
+        $x = $mm->[$i  ];
+        $aa = (($aa ^ ($aa << 13)) + $mm->[($i   + 128) & 0xff]);
+        $aa &= 0xffffffff; # Mask out high bits for 64-bit systems
+        $mm->[$i  ] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+        $r->[$i  ] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
 
-  my ($x, $y); # temporary storage
+        # I don't actually know why the "0x03ffffff" stuff is for. It was in
+        # John L. Allen's code. If you can explain this please file a bug report.
+        $x = $mm->[$i+1];
+        $aa = (($aa ^ (0x03ffffff & ($aa >> 6))) + $mm->[($i+1+128) & 0xff]);
+        $aa &= 0xffffffff;
+        $mm->[$i+1] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+        $r->[$i+1] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
 
-  # The C code deals with two halves of the randmem separately; we deal with
-  # it here in one loop, by adding the &0xff parts. These calls represent the
-  # rngstep() macro, but it's inlined here for speed.
-  for (my $i = 0; $i < 256; $i += 4)
-  {
-    $x = $mm->[$i  ];
-    $aa = (($aa ^ ($aa << 13)) + $mm->[($i   + 128) & 0xff]);
-    $aa &= 0xffffffff; # Mask out high bits for 64-bit systems
-    $mm->[$i  ] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
-    $r->[$i  ] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+        $x = $mm->[$i+2];
+        $aa = (($aa ^ ($aa << 2)) + $mm->[($i+2 + 128) & 0xff]);
+        $aa &= 0xffffffff;
+        $mm->[$i+2] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+        $r->[$i+2] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
 
-    # I don't actually know why the "0x03ffffff" stuff is for. It was in
-    # John L. Allen's code. If you can explain this please file a bug report.
-    $x = $mm->[$i+1];
-    $aa = (($aa ^ (0x03ffffff & ($aa >> 6))) + $mm->[($i+1+128) & 0xff]);
-    $aa &= 0xffffffff;
-    $mm->[$i+1] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
-    $r->[$i+1] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+        $x = $mm->[$i+3];
+        $aa = (($aa ^ (0x0000ffff & ($aa >> 16))) + $mm->[($i+3 + 128) & 0xff]);
+        $aa &= 0xffffffff;
+        $mm->[$i+3] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
+        $r->[$i+3] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
+    }
 
-    $x = $mm->[$i+2];
-    $aa = (($aa ^ ($aa << 2)) + $mm->[($i+2 + 128) & 0xff]);
-    $aa &= 0xffffffff;
-    $mm->[$i+2] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
-    $r->[$i+2] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
-
-    $x = $mm->[$i+3];
-    $aa = (($aa ^ (0x0000ffff & ($aa >> 16))) + $mm->[($i+3 + 128) & 0xff]);
-    $aa &= 0xffffffff;
-    $mm->[$i+3] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
-    $r->[$i+3] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
-  }
-
-  @{$self}{qw/randb randa/} = ($bb,$aa);
-  return;
+    @{$self}{qw/randb randa/} = ($bb,$aa);
+    return;
 }
 
 sub _randinit
 {
-  my ($self) = @_;
-  use integer;
+    my ($self) = @_;
+    use integer;
 
-  # $a and $b are reserved (see 'sort'); $i is the iterator
-  my ($c, $d, $e, $f, $g, $h, $j, $k) = (0x9e3779b9)x8; # The golden ratio.
+    # $a and $b are reserved (see 'sort'); $i is the iterator
+    my ($c, $d, $e, $f, $g, $h, $j, $k) = (0x9e3779b9)x8; # The golden ratio.
+    my $mm = $self->{randmem};
+    my $r  = $self->{randrsl};
 
-  my $mm = $self->{randmem};
-  my $r = $self->{randrsl};
+    for (1..4) {
+        $c ^= $d << 11;                     $f += $c;       $d += $e;
+        $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
+        $e ^= $f << 8;                      $h += $e;       $f += $g;
+        $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
+        $g ^= $h << 10;                     $k += $g;       $h += $j;
+        $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
+        $j ^= $k << 8;                      $d += $j;       $k += $c;
+        $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
+    }
 
-  for (1..4)
-  {
-    $c ^= $d << 11;                     $f += $c;       $d += $e;
-    $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
-    $e ^= $f << 8;                      $h += $e;       $f += $g;
-    $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
-    $g ^= $h << 10;                     $k += $g;       $h += $j;
-    $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
-    $j ^= $k << 8;                      $d += $j;       $k += $c;
-    $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
-  }
+    for (my $i = 0; $i < 256; $i += 8) {
+        $c += $r->[$i  ];   $d += $r->[$i+1];
+        $e += $r->[$i+2];   $f += $r->[$i+3];
+        $g += $r->[$i+4];   $h += $r->[$i+5];
+        $j += $r->[$i+6];   $k += $r->[$i+7];
 
-  for (my $i = 0; $i < 256; $i += 8)
-  {
-    $c += $r->[$i  ];   $d += $r->[$i+1];
-    $e += $r->[$i+2];   $f += $r->[$i+3];
-    $g += $r->[$i+4];   $h += $r->[$i+5];
-    $j += $r->[$i+6];   $k += $r->[$i+7];
+        $c ^= $d << 11;                     $f += $c;       $d += $e;
+        $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
+        $e ^= $f << 8;                      $h += $e;       $f += $g;
+        $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
+        $g ^= $h << 10;                     $k += $g;       $h += $j;
+        $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
+        $j ^= $k << 8;                      $d += $j;       $k += $c;
+        $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
 
-    $c ^= $d << 11;                     $f += $c;       $d += $e;
-    $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
-    $e ^= $f << 8;                      $h += $e;       $f += $g;
-    $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
-    $g ^= $h << 10;                     $k += $g;       $h += $j;
-    $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
-    $j ^= $k << 8;                      $d += $j;       $k += $c;
-    $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
+        $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
+        $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
+        $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
+        $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
+    }
 
-    $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
-    $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
-    $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
-    $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
-  }
+    for (my $i = 0; $i < 256; $i += 8) {
+        $c += $mm->[$i  ];  $d += $mm->[$i+1];
+        $e += $mm->[$i+2];  $f += $mm->[$i+3];
+        $g += $mm->[$i+4];  $h += $mm->[$i+5];
+        $j += $mm->[$i+6];  $k += $mm->[$i+7];
 
-  for (my $i = 0; $i < 256; $i += 8)
-  {
-    $c += $mm->[$i  ];  $d += $mm->[$i+1];
-    $e += $mm->[$i+2];  $f += $mm->[$i+3];
-    $g += $mm->[$i+4];  $h += $mm->[$i+5];
-    $j += $mm->[$i+6];  $k += $mm->[$i+7];
+        $c ^= $d << 11;                     $f += $c;       $d += $e;
+        $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
+        $e ^= $f << 8;                      $h += $e;       $f += $g;
+        $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
+        $g ^= $h << 10;                     $k += $g;       $h += $j;
+        $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
+        $j ^= $k << 8;                      $d += $j;       $k += $c;
+        $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
 
-    $c ^= $d << 11;                     $f += $c;       $d += $e;
-    $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
-    $e ^= $f << 8;                      $h += $e;       $f += $g;
-    $f ^= 0x0000ffff & ($g >> 16);      $j += $f;       $g += $h;
-    $g ^= $h << 10;                     $k += $g;       $h += $j;
-    $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
-    $j ^= $k << 8;                      $d += $j;       $k += $c;
-    $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
+        $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
+        $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
+        $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
+        $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
+    }
 
-    $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
-    $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
-    $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
-    $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
-  }
-
-  $self->_isaac();
-  $self->{randcnt} = 256;
-
-  return;
+    $self->_isaac();
+    $self->{randcnt} = 256;
+    return;
 }
 
 1;
@@ -176,7 +421,7 @@ use strict;
 use warnings;
 use Carp ();
 
-our $VERSION = '1.004';
+our $VERSION = '1.004'; # Based on the CPAN version by similar name.
 
 my %CSPRNG = (
     XS  => 'Math::Random::ISAAC::XS',
@@ -207,9 +452,9 @@ sub new {
 ## no critic (ProhibitBuiltinHomonyms)
 
 sub irand {
-  my ($self) = @_;
-  Carp::croak('You must call this method as an object') unless ref($self);
-  return $self->{_backend}->irand();
+    my ($self) = @_;
+    Carp::croak('You must call this method as an object') unless ref($self);
+    return $self->{_backend}->irand();
 }
 
 1;
@@ -220,8 +465,8 @@ use strict;
 use warnings;
 use 5.006000;
 use Carp;
-#use Math::Random::ISAAC::Embeded;
-use Crypt::Random::Seed;
+# use Math::Random::ISAAC::Embeded;
+# use Crypt::Random::Seed::Embedded;
 use Hash::Util; # We lock internal hash to prevent post-instantiation manip.
 
 our $VERSION = '0.01';
@@ -229,9 +474,6 @@ our $VERSION = '0.01';
 # See Math::Random::ISAAC https://rt.cpan.org/Public/Bug/Display.html?id=64324
 use constant SEED_SIZE => 256; # bits; eight 32-bit words.
 
-# Contrary to previous strategies of lazy-seeding / prng-instantiation, we
-# instantiate the RNG on object instantiation, and lock the internal hash
-# so that others cannot change it once instantiated.
 sub new {
     my($self, $class, $bits) = ({}, @_);
     $bits ||= SEED_SIZE;  # This will be eight 32-bit words.
@@ -240,7 +482,7 @@ sub new {
     return Hash::Util::lock_hashref bless {
         bits => $bits,
         _rng => Math::Random::ISAAC::Embedded->new(do{
-            my $source = Crypt::Random::Seed->new(Weak=>0, NonBlocking=>1)
+            my $source = Crypt::Random::Seed::Embedded->new(NonBlocking=>1)
                 || die 'Could not get a seed source.';
             $source->random_values($bits/32);
         }),
@@ -252,29 +494,29 @@ sub irand {shift->{'_rng'}->irand} # public API, and consumed internally.
 sub bytes_hex {unpack 'H*', shift->bytes(shift)} # lc Hex digits only, no '0x'
 
 sub bytes {
-  my($self, $bytes) = @_;
-  $bytes  = defined $bytes ? int abs $bytes : 0; # Default 0, coerce to UINT.
-  my $str = q{};
-  while ($bytes >= 4) {                  # Utilize irand()'s 32 bits.
-    $str .= pack("L", $self->irand);
-    $bytes -= 4;
-  }
-  if ($bytes > 0) { # Handle 16b and 8b respectively.
-    $str .= pack("S", ($self->irand >> 8) & 0xFFFF) if $bytes >= 2;
-    $str .= pack("C", $self->irand & 0xFF) if $bytes % 2;
-  }
-  return $str;
+      my($self, $bytes) = @_;
+    $bytes  = defined $bytes ? int abs $bytes : 0; # Default 0, coerce to UINT.
+    my $str = q{};
+    while ($bytes >= 4) {                  # Utilize irand()'s 32 bits.
+        $str .= pack("L", $self->irand);
+        $bytes -= 4;
+    }
+    if ($bytes > 0) { # Handle 16b and 8b respectively.
+        $str .= pack("S", ($self->irand >> 8) & 0xFFFF) if $bytes >= 2;
+        $str .= pack("C", $self->irand & 0xFF) if $bytes % 2;
+    }
+    return $str;
 }
 
 sub string_from {
-  my($self, $bag, $bytes) = @_;
-  $bag           = defined $bag ? $bag : q{};
-  $bytes         = defined $bytes ? int abs $bytes : 0;
-  my $range      = length $bag;
-  croak 'Bag size must be at least one character.' unless $range;
-  my $rand_bytes = q{}; # We need an empty, defined string.
-  $rand_bytes  .= substr $bag, $_, 1 for $self->_ranged_randoms($range, $bytes);
-  return $rand_bytes;
+    my($self, $bag, $bytes) = @_;
+    $bag           = defined $bag ? $bag : q{};
+    $bytes         = defined $bytes ? int abs $bytes : 0;
+    my $range      = length $bag;
+    croak 'Bag size must be at least one character.' unless $range;
+    my $rand_bytes = q{}; # We need an empty, defined string.
+    $rand_bytes  .= substr $bag, $_, 1 for $self->_ranged_randoms($range, $bytes);
+    return $rand_bytes;
 }
 
 sub _ranged_randoms {
