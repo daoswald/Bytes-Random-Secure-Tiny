@@ -15,235 +15,185 @@ use Carp qw/carp croak/;
 our $VERSION = '0.03';
 use constant UINT32_SIZE => 4;
 
-# These are the pre-defined names.  We don't let user methods use these.
-my %defined_methods = map { $_ => 1 }
-  qw(CryptGenRandom RtlGenRand EGD /dev/random /dev/urandom);
-
-# If given one of these names as whitelist/blacklist, we add these also.
-my %name_aliases = ('Win32'  => [qw(RtlGenRand CryptGenRandom)]);
-
 sub new {
-  my ($class, %params) = @_;
-  my $self = {};
+    my ($class, %params) = @_;
+    my $self = {};
 
-  if (defined $params{Source}) {
-    if (ref($params{Source}) eq 'CODE') {
-      $self->{Name}      = 'User';
-      $self->{SourceSub} = $params{Source};
-      $self->{Blocking}  = 0;
-      $self->{Strong}    = 0;
-    } elsif (ref($params{Source}) eq 'ARRAY') {
-      ($self->{Name}, $self->{SourceSub}, $self->{Blocking}, $self->{Strong})
-        = @{$params{Source}};
-      # For sanity, don't let them redefine the standard names.
-      croak "Invalid name: $self->{Name}.  Name reserved."
-        if defined $defined_methods{$self->{Name}};
-    } else {
-      croak "Invalid 'Source'.  Should be code or array reference.";
-    }
-  } else {
     # This is a sorted list -- the first one that returns true gets used.
-    my @methodlist = (
-       \&_try_win32,
-       \&_try_egd,
-       \&_try_dev_random,
-       \&_try_dev_urandom,
-    );
-
-    my %whitelist;
-    my $have_whitelist = 0;
-    if (defined $params{Only}) {
-      croak "Parameter 'Only' must be an array ref" unless ref($params{Only}) eq 'ARRAY';
-      $have_whitelist = 1;
-      $whitelist{$_} = 1 for @{$params{Only}};
-      while ( my($name, $list) = each %name_aliases) {
-        @whitelist{@$list} = (1) x scalar @$list if $whitelist{$name};
-      }
-    }
-    my %blacklist;
-    if (defined $params{Never}) {
-      croak "Parameter 'Never' must be an array ref" unless ref($params{Never}) eq 'ARRAY';
-      $blacklist{$_} = 1 for @{$params{Never}};
-      while ( my($name, $list) = each %name_aliases) {
-        @blacklist{@$list} = (1) x scalar @$list if $blacklist{$name};
-      }
-    }
+    my @methodlist
+        = ( \&_try_win32, \&_try_egd, \&_try_dev_random, \&_try_dev_urandom );
 
     foreach my $m (@methodlist) {
-      my ($name, $rsub, $isblocking, $isstrong) = $m->();
-      next unless defined $name;
-      next if $isblocking &&
-        ($params{NonBlocking} || $params{Nonblocking} || $params{nonblocking});
-      next if $blacklist{$name};
-      next if $have_whitelist && !$whitelist{$name};
-      $self->{Name}      = $name;
-      $self->{SourceSub} = $rsub;
-      $self->{Blocking}  = $isblocking;
-      $self->{Strong}    = $isstrong;
-      last;
+        my ($name, $rsub, $isblocking, $isstrong) = $m->();
+        next unless defined $name;
+        next if $isblocking
+            &&  grep { $_ } @params{qw( NonBlocking Nonblocking nonblocking )};
+        @{$self}{qw( Name    SourceSub  Blocking      Strong    )}
+                 = ( $name,  $rsub,     $isblocking,  $isstrong );
+        last;
     }
-  }
-  # Couldn't find anything appropriate
-  return unless defined $self->{SourceSub};
-  bless $self, $class;
-  return $self;
+
+    # Couldn't find anything appropriate
+    return unless defined $self->{SourceSub};
+    bless $self, $class;
+    return $self;
 }
 
 sub random_values {
-  my ($self, $nvalues) = @_;
-  return unless defined $nvalues && int($nvalues) > 0;
-  my $rsub = $self->{SourceSub};
-  return unless defined $rsub;
-  return unpack( 'L*', $rsub->(UINT32_SIZE * int($nvalues)) );
+    my ($self, $nvalues) = @_;
+    return unless defined $nvalues && int($nvalues) > 0;
+    my $rsub = $self->{SourceSub};
+    return unless defined $rsub;
+    return unpack( 'L*', $rsub->(UINT32_SIZE * int($nvalues)) );
 }
 
 sub _try_dev_urandom {
-  return unless -r "/dev/urandom";
-  return ('/dev/urandom', sub { __read_file('/dev/urandom', @_); }, 0, 0);
+    return unless -r "/dev/urandom";
+    return ('/dev/urandom', sub { __read_file('/dev/urandom', @_); }, 0, 0);
 }
 
 sub _try_dev_random {
-  return unless -r "/dev/random";
-  # FreeBSD's /dev/random is 256-bit Yarrow non-blocking.
-  # Is it 'strong'?  Debatable -- we'll say it is.
-  my $blocking = ($^O eq 'freebsd') ? 0 : 1;
-  return ('/dev/random', sub { __read_file('/dev/random', @_); }, $blocking, 1);
+    return unless -r "/dev/random";
+    # FreeBSD's /dev/random is 256-bit Yarrow non-blocking.
+    # Is it 'strong'?  Debatable -- we'll say it is.
+    my $blocking = ($^O eq 'freebsd') ? 0 : 1;
+    return ('/dev/random', sub { __read_file('/dev/random', @_); },
+            $blocking, 1);
 }
 
 sub __read_file {
-  my ($file, $nbytes) = @_;
-  return unless defined $nbytes && $nbytes > 0;
-  sysopen(my $fh, $file, O_RDONLY);
-  binmode $fh;
-  my($s, $buffer, $nread) = ('', '', 0);
-  while ($nread < $nbytes) {
-    my $thisread = sysread $fh, $buffer, $nbytes-$nread;
-    # Count EOF as an error.
-    croak "Error reading $file: $!\n" unless defined $thisread && $thisread > 0;
-    $s .= $buffer;
-    $nread += length($buffer);
-    #die unless $nread == length($s);  # assert
-  }
-  croak "Internal file read error: wanted $nbytes, read $nread"
-      unless $nbytes == length($s);  # assert
-  return $s;
+    my ($file, $nbytes) = @_;
+    return unless defined $nbytes && $nbytes > 0;
+    sysopen(my $fh, $file, O_RDONLY);
+    binmode $fh;
+    my($s, $buffer, $nread) = ('', '', 0);
+    while ($nread < $nbytes) {
+        my $thisread = sysread $fh, $buffer, $nbytes-$nread;
+        # Count EOF as an error.
+        croak "Error reading $file: $!\n"
+            unless defined $thisread && $thisread > 0;
+        $s .= $buffer;
+        $nread += length($buffer);
+    }
+    croak "Internal file read error: wanted $nbytes, read $nread"
+        unless $nbytes == length($s);  # assert
+    return $s;
 }
 
 sub _try_win32 {
-  return unless $^O eq 'MSWin32';
-  # Cygwin has /dev/random at least as far back as 2000.
-  eval { require Win32; require Win32::API; require Win32::API::Type; 1; }
-  or return;
+    return unless $^O eq 'MSWin32';
+    # Cygwin has /dev/random at least as far back as 2000.
+    eval { require Win32; require Win32::API; require Win32::API::Type; 1; }
+        or return;
 
-  use constant CRYPT_SILENT      => 0x40;       # Never display a UI.
-  use constant PROV_RSA_FULL     => 1;          # Which service provider.
-  use constant VERIFY_CONTEXT    => 0xF0000000; # Don't need existing keypairs.
-  use constant W2K_MAJOR_VERSION => 5;          # Windows 2000
-  use constant W2K_MINOR_VERSION => 0;
+    use constant CRYPT_SILENT      => 0x40;       # Never display a UI.
+    use constant PROV_RSA_FULL     => 1;          # Which service provider.
+    use constant VERIFY_CONTEXT    => 0xF0000000; # Don't need existing keepairs
+    use constant W2K_MAJOR_VERSION => 5;          # Windows 2000
+    use constant W2K_MINOR_VERSION => 0;
 
-  my ($major, $minor) = (Win32::GetOSVersion())[1, 2];
-  return if $major < W2K_MAJOR_VERSION;
+    my ($major, $minor) = (Win32::GetOSVersion())[1, 2];
+    return if $major < W2K_MAJOR_VERSION;
 
-  if ($major == W2K_MAJOR_VERSION && $minor == W2K_MINOR_VERSION) {
-    # We are Windows 2000.  Use the older CryptGenRandom interface.
-    my $crypt_acquire_context_a =
-              Win32::API->new( 'advapi32', 'CryptAcquireContextA', 'PPPNN',
-                'I' );
-    return unless defined $crypt_acquire_context_a;
-    my $context = chr(0) x Win32::API::Type->sizeof('PULONG');
-    my $result = $crypt_acquire_context_a->Call(
+    if ($major == W2K_MAJOR_VERSION && $minor == W2K_MINOR_VERSION) {
+        # We are Windows 2000.  Use the older CryptGenRandom interface.
+        my $crypt_acquire_context_a =
+            Win32::API->new('advapi32', 'CryptAcquireContextA', 'PPPNN','I');
+        return unless defined $crypt_acquire_context_a;
+        my $context = chr(0) x Win32::API::Type->sizeof('PULONG');
+        my $result = $crypt_acquire_context_a->Call(
              $context, 0, 0, PROV_RSA_FULL, CRYPT_SILENT | VERIFY_CONTEXT );
-    return unless $result;
-    my $pack_type = Win32::API::Type::packing('PULONG');
-    $context = unpack $pack_type, $context;
-    my $crypt_gen_random =
-              Win32::API->new( 'advapi32', 'CryptGenRandom', 'NNP', 'I' );
-    return unless defined $crypt_gen_random;
-    return ('CryptGenRandom',
+        return unless $result;
+        my $pack_type = Win32::API::Type::packing('PULONG');
+        $context = unpack $pack_type, $context;
+        my $crypt_gen_random =
+            Win32::API->new( 'advapi32', 'CryptGenRandom', 'NNP', 'I' );
+        return unless defined $crypt_gen_random;
+        return ('CryptGenRandom',
             sub {
-              my $nbytes = shift;
-              my $buffer = chr(0) x $nbytes;
-              my $result = $crypt_gen_random->Call($context, $nbytes, $buffer);
-              croak "CryptGenRandom failed: $^E" unless $result;
-              return $buffer;
-            },
-            0, 1);  # Assume non-blocking and strong
-  } else {
-    my $rtlgenrand = Win32::API->new( 'advapi32', <<'_RTLGENRANDOM_PROTO_');
+                my $nbytes = shift;
+                my $buffer = chr(0) x $nbytes;
+                my $result = $crypt_gen_random->Call($context, $nbytes, $buffer);
+                croak "CryptGenRandom failed: $^E" unless $result;
+                return $buffer;
+            }, 0, 1);  # Assume non-blocking and strong
+    } else {
+        my $rtlgenrand = Win32::API->new( 'advapi32', <<'_RTLGENRANDOM_PROTO_');
 INT SystemFunction036(
   PVOID RandomBuffer,
   ULONG RandomBufferLength
 )
 _RTLGENRANDOM_PROTO_
-    return unless defined $rtlgenrand;
-    return ('RtlGenRand',
+        return unless defined $rtlgenrand;
+        return ('RtlGenRand',
             sub {
-              my $nbytes = shift;
-              my $buffer = chr(0) x $nbytes;
-              my $result = $rtlgenrand->Call($buffer, $nbytes);
-              croak "RtlGenRand failed: $^E" unless $result;
-              return $buffer;
-            },
-            0, 1);  # Assume non-blocking and strong
-  }
-  return;
+                my $nbytes = shift;
+                my $buffer = chr(0) x $nbytes;
+                my $result = $rtlgenrand->Call($buffer, $nbytes);
+                croak "RtlGenRand failed: $^E" unless $result;
+                return $buffer;
+            }, 0, 1);  # Assume non-blocking and strong
+    }
+    return;
 }
 
 sub _try_egd {
-  # For locations, we'll look in the files OpenSSL's RAND_egd looks, as well
-  # as /etc/entropy which egd 0.9 recommends.  This also works with PRNGD.
-  # PRNGD uses a seed+CSPRNG so is non-blocking, but we can't tell them apart.
-  foreach my $device (qw( /var/run/egd-pool /dev/egd-pool /etc/egd-pool /etc/entropy )) {
-    next unless -r $device && -S $device;
-    eval { require IO::Socket; 1; } or return;
-    # We're looking for a socket that returns the entropy available when given
-    # that command.  Set timeout to 1 to prevent hanging -- if it is a socket
-    # but won't return the available entropy in under a second, move on.
-    my $socket = IO::Socket::UNIX->new(Peer => $device, Timeout => 1);
-    next unless $socket;
-    $socket->syswrite( pack("C", 0x00), 1) or next;
-    die if $socket->error;
-    my($entropy_string, $nread);
-    # Sadly this doesn't honor the timeout.  We'll have to do an eval / alarm.
-    # We only timeout here if this is a live socket to a sleeping process.
-    eval {
-      local $SIG{ALRM} = sub { die "alarm\n" };
-      alarm 1;
-      $nread = $socket->sysread($entropy_string, 4);
-      alarm 0;
-    };
-    if ($@) {
-      die unless $@ eq "alarm\n";
-      next;
+    # For locations, we'll look in the files OpenSSL's RAND_egd looks, as well
+    # as /etc/entropy which egd 0.9 recommends.  This also works with PRNGD.
+    # PRNGD uses a seed+CSPRNG so is non-blocking, but we can't tell them apart.
+    my @devices
+        = qw(/var/run/egd-pool /dev/egd-pool /etc/egd-pool /etc/entropy);
+    foreach my $device (@devices) {
+        next unless -r $device && -S $device;
+        eval { require IO::Socket; 1; } or return;
+        # We're looking for a socket that returns entropy available when given
+        # that command. Set timeout to 1 to prevent hanging -- if it is a socket
+        # but won't return the available entropy in under a second, move on.
+        my $socket = IO::Socket::UNIX->new(Peer => $device, Timeout => 1);
+        next unless $socket;
+        $socket->syswrite( pack("C", 0x00), 1) or next;
+        die if $socket->error;
+        my($entropy_string, $nread);
+        # Sadly this doesn't honor the timeout. We'll have to do an eval/alarm.
+        # We only timeout here if this is a live socket to a sleeping process.
+        eval {
+            local $SIG{ALRM} = sub { die "alarm\n" };
+            alarm 1;
+            $nread = $socket->sysread($entropy_string, 4);
+            alarm 0;
+        };
+        if ($@) {
+            die unless $@ eq "alarm\n";
+            next;
+        }
+        next unless defined $nread && $nread == 4;
+        my $entropy_avail = unpack("N", $entropy_string);
+        return ('EGD', sub { __read_egd($device, @_); }, 1, 1);
     }
-    next unless defined $nread && $nread == 4;
-    my $entropy_avail = unpack("N", $entropy_string);
-    return ('EGD', sub { __read_egd($device, @_); }, 1, 1);
-  }
-  return;
+    return;
 }
 
 sub __read_egd {
-  my ($device, $nbytes) = @_;
-  return unless defined $device;
-  return unless defined $nbytes && int($nbytes) > 0;
-  croak "$device doesn't exist!" unless -r $device && -S $device;
-  my $socket = IO::Socket::UNIX->new(Peer => $device);
-  croak "Can't talk to EGD on $device. $!" unless $socket;
-  my($s, $buffer, $toread) = ('', '', $nbytes);
-  while ($toread > 0) {
-    my $this_request = ($toread > 255) ? 255 : $toread;
-    # Use the blocking interface.
-    $socket->syswrite( pack("CC", 0x02, $this_request), 2);
-    my $this_grant = $socket->sysread($buffer, $this_request);
-    croak "Error reading EDG data from $device: $!\n"
-          unless defined $this_grant && $this_grant == $this_request;
-    $s .= $buffer;
-    $toread -= length($buffer);
-  }
-  croak "Internal EGD read error: wanted $nbytes, read ", length($s), ""
-      unless $nbytes == length($s);  # assert
-  return $s;
+    my ($device, $nbytes) = @_;
+    return unless defined $device;
+    return unless defined $nbytes && int($nbytes) > 0;
+    croak "$device doesn't exist!" unless -r $device && -S $device;
+    my $socket = IO::Socket::UNIX->new(Peer => $device);
+    croak "Can't talk to EGD on $device. $!" unless $socket;
+    my($s, $buffer, $toread) = ('', '', $nbytes);
+    while ($toread > 0) {
+        my $this_request = ($toread > 255) ? 255 : $toread;
+        # Use the blocking interface.
+        $socket->syswrite( pack("CC", 0x02, $this_request), 2);
+        my $this_grant = $socket->sysread($buffer, $this_request);
+        croak "Error reading EDG data from $device: $!\n"
+            unless defined $this_grant && $this_grant == $this_request;
+        $s .= $buffer;
+        $toread -= length($buffer);
+    }
+    croak "Internal EGD read error: wanted $nbytes, read ", length($s), ""
+        unless $nbytes == length($s);  # assert
+    return $s;
 }
 
 1;
