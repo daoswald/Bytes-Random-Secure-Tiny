@@ -35,8 +35,7 @@ sub new {
 
     # Couldn't find anything appropriate
     return unless defined $self->{SourceSub};
-    bless $self, $class;
-    return $self;
+    return bless $self, $class;
 }
 
 sub random_values {
@@ -228,16 +227,13 @@ sub new {
         randa   => 0,         randb   => 0,     randc   => 0,
     };
 
-    bless($self, $class);
-    $self->_randinit();
+    bless $self, $class;
+    $self->_randinit;
     return $self;
 }
 
-## no critic (ProhibitBuiltinHomonyms)
-
 sub irand {
-    my ($self) = @_;
-
+    my $self = shift;
     # Reset the sequence if we run out of random stuff
     if (!$self->{randcnt}--) {
         _isaac($self);
@@ -250,7 +246,7 @@ sub irand {
 ## no critic (RequireNumberSeparators)
 
 sub _isaac {
-    my ($self) = @_;
+    my $self = shift;
     use integer;
 
     my $mm = $self->{randmem};
@@ -295,9 +291,8 @@ sub _isaac {
     return;
 }
 
-sub _randinit
-{
-    my ($self) = @_;
+sub _randinit {
+    my $self = shift;
     use integer;
 
     # $a and $b are reserved (see 'sort'); $i is the iterator
@@ -358,7 +353,7 @@ sub _randinit
         $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
     }
 
-    $self->_isaac();
+    $self->_isaac;
     $self->{randcnt} = 256;
     return;
 }
@@ -382,7 +377,6 @@ my %CSPRNG = (
 # Wrappers around the actual methods
 sub new {
     my ($class, @seed) = @_;
-    Carp::croak('You must call this as a class method') if ref($class);
 
     our $EMBEDDED_CSPRNG =
         defined $EMBEDDED_CSPRNG             ? $EMBEDDED_CSPRNG             :
@@ -399,13 +393,7 @@ sub new {
     return bless { '_backend' => $DRIVER->new(@seed) }, $class;
 }
 
-## no critic (ProhibitBuiltinHomonyms)
-
-sub irand {
-    my ($self) = @_;
-    Carp::croak('You must call this method as an object') unless ref($self);
-    return $self->{_backend}->irand();
-}
+sub irand {shift->{_backend}->irand}
 
 1;
 
@@ -436,7 +424,7 @@ sub new {
                 || die 'Could not get a seed source.';
             $source->random_values($bits/32);
         }),
-    }, shift;
+    }, $class;
 }
 
 sub _ispowerof2 {my $n = shift; return ($n >= 0) && (($n & ($n-1)) ==0 )}
