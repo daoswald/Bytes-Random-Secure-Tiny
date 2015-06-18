@@ -136,7 +136,7 @@ my @results = (
 
 plan tests => scalar(@results);
 
-my $rng = Math::Random::ISAAC::PP::Embedded->new();
+my $rng = Math::Random::ISAAC::PP::Embedded->new;
 
 foreach my $num (@results) {
   is($rng->irand(), $num);

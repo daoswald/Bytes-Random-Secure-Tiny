@@ -16,7 +16,7 @@ $ENV{'BRST_DEBUG'} = 1;
 # Much of this has already been put through the paces via the "functions" layer
 # tests in 20-functions.t, so we're only going for coverage here.
 
-my $random = Bytes::Random::Secure::Tiny->new(64);
+my $random = Bytes::Random::Secure::Tiny->new(bits => 64);
 
 is( length $random->bytes(10), 10, 'bytes(10) returns ten bytes.' );
 
@@ -43,7 +43,7 @@ ok( $rv == int( $rv ), 'irand produces an integer.' );
   ok( $max <= 2**32-1, 'irand(): Maximum return value is <= 2**32-1.' );
 }
 
-my $newirand = Bytes::Random::Secure::Tiny->new(64)->irand;
+my $newirand = Bytes::Random::Secure::Tiny->new(bits =>64)->irand;
 
 ok( $newirand == int( $newirand ),
     'irand instantiates a new RNG on first call with fresh object.' );

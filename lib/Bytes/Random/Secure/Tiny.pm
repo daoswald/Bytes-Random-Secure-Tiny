@@ -17,24 +17,22 @@ use constant UINT32_SIZE => 4;
 
 sub new {
     my ($class, %params) = @_;
+    $params{lc $_} = delete $params{$_} for keys %params;
     my $self = {};
-
-    # This is a sorted list -- the first one that returns true gets used.
     my @methodlist
         = ( \&_try_win32, \&_try_egd, \&_try_dev_random, \&_try_dev_urandom );
 
     foreach my $m (@methodlist) {
         my ($name, $rsub, $isblocking, $isstrong) = $m->();
         next unless defined $name;
-        next if $isblocking
-            &&  grep { $_ } @params{qw( NonBlocking Nonblocking nonblocking )};
+        next if $isblocking && $params{nonblocking};
         @{$self}{qw( Name    SourceSub  Blocking      Strong    )}
                  = ( $name,  $rsub,     $isblocking,  $isstrong );
         last;
     }
 
     # Couldn't find anything appropriate
-    return unless defined $self->{SourceSub};
+    return unless defined $self->{SourceSub}; # uncoverable branch true
     return bless $self, $class;
 }
 
@@ -42,7 +40,6 @@ sub random_values {
     my ($self, $nvalues) = @_;
     return unless defined $nvalues && int($nvalues) > 0;
     my $rsub = $self->{SourceSub};
-    return unless defined $rsub;
     return unpack( 'L*', $rsub->(UINT32_SIZE * int($nvalues)) );
 }
 
@@ -413,15 +410,17 @@ our $VERSION = '0.01';
 use constant SEED_SIZE => 256; # bits; eight 32-bit words.
 
 sub new {
-    my($self, $class, $bits) = ({}, @_);
-    $bits ||= SEED_SIZE;  # This will be eight 32-bit words.
+    my($self, $class, %args) = ({}, @_);
+    $args{lc $_} = delete $args{$_} for keys %args; # Convert args to lc names
+    my $bits = exists $args{bits} ? $args{bits} : SEED_SIZE; # Dflt 8-32b wrds
     die "Number of bits must be 64 <= n <= 8192, and a multipe in 2^n: $bits"
         if $bits < 64 || $bits > 8192 || !_ispowerof2($bits);
     return Hash::Util::lock_hashref bless {
         bits => $bits,
         _rng => Math::Random::ISAAC::Embedded->new(do{
-            my $source = Crypt::Random::Seed::Embedded->new(NonBlocking=>1)
-                || die 'Could not get a seed source.';
+            my $source = Crypt::Random::Seed::Embedded->new(
+                exists $args{nonblocking} ? (NonBlocking => $args{nonblocking}) : (NonBlocking=>1)
+            ) || die 'Could not get a seed source.';
             $source->random_values($bits/32);
         }),
     }, $class;
@@ -493,7 +492,7 @@ cryptographically-secure random bytes.
 
     use Bytes::Random::Secure::Tiny;
 
-    my $rng = Bytes::Random::Secure->new; # Seed with 512 bits.
+    my $rng = Bytes::Random::Secure->new; # Seed with 256 bits.
 
     my $bytes  = $rng->bytes(32);        # A string of 32 random bytes.
     my $long   = $rng->irand;            # 32-bit random integer.
@@ -504,20 +503,21 @@ cryptographically-secure random bytes.
 =head1 DESCRIPTION
 
 L<Bytes::Random::Secure> provides random bytes from a cryptographically
-secure random number generator, seeded from strong entropy sources on a wide
-variety of platforms.  It is configurable, and has a flexible user interface.
+secure random number generator (ISAAC), seeded from strong entropy sources
+on a wide variety of platforms.  It is configurable, and has a flexible
+user interface.
 
-But it has a handful of dependencies.  And its UI may be more complex than
-the typical user needs.  L<Bytes::Random::Secure::Tiny> is designed to provide
+But it has a handful of dependencies. And its UI may be bigger than
+a typical user needs.  L<Bytes::Random::Secure::Tiny> is designed to provide
 what 90% of Bytes::Random::Secure's users need, but with a simpler user
-interface, no configuration, and in a single module with no dependencies
-beyond core Perl.
+interface, almost no configuration, and in a single module with no
+dependencies beyond core Perl.
 
-In many cases this module may be a drop-in replacement for
+In many cases this module may be used as a drop-in replacement for
 L<Bytes::Random::Secure>. This module uses a cryptographic quality random
 number generator that uses the ISAAC algorithm, adapted from
 L<Math::Random::ISAAC>, and should be suitable for cryptographic purposes.
-The harder problem to solve is how to seed the generator.  This module uses
+The harder problem to solve is how to seed the generator. This module uses
 an approach adapted from L<Crypt::Random::Seed> to generate the initial
 seeds for the ISAAC CSPRNG.
 
@@ -553,9 +553,13 @@ generator based on the seed. It has taken a good deal of research to come up
 with what I feel is a strong and sensible choice of established and published
 algorithms. The interface is designed with minimalism and simplicity in mind.
 
-As a C<::Tiny> module, the additional goals of no dependencies and a
+Furthermore, this module runs its randomness through both statistical tests
+and NIST L<FIPS-140|https://en.wikipedia.org/wiki/FIPS_140> tests to verify
+integrity.
+
+As a C<::Tiny> module, the additional goals of low (or no) dependencies and a
 light-weight code base make this an ideal choice for environments where
-heavier dependency chains are avoided.
+heavier dependency chains are problematic.
 
 =head1 EXPORTS
 
@@ -566,19 +570,48 @@ Nothing is exported.
 =head2 new
 
     my $rng = Bytes::Random::Secure::Tiny->new;
+    my $rng = Bytes::Random::Secure::Tiny->new(bits => 128);
+    my $rng = Bytes::Random::Secure::Tiny->new(nonblocking => 0);
 
-Instantiate the pseudo-random number generator object. The seeding of the 
-ISAAC CSPRING is lazy; it happens only the first time an accessor is used.
+Instantiate the pseudo-random number generator object. The seeding of the
+ISAAC CSPRING defaults to 256 bits from a non-blocking entropy source.
 The CSPRNG object should be instantiated as infrequently as practical;
 there is no advantage to re-seeding... ever, with the single cavaet that
 the CSPRNG object should not be shared by threads or forked processes.
+
+
+=head3 Constructor parameters
+
+Parameters described below are optional and case-insensitive.
+
+=over 4
+
+=item bits
+
+Number of bits to use in seeding. Must be a value between 64 and 8192,
+inclusive, and must satisfy C<bits=2**n>.  The default value is 256.
+
+=item nonblocking
+
+If set to a false value, a blocking entropy source may be used in seeding.
+This is generally not necessary, as the non-blocking sources used are
+considered by many to be strong enough for cryptographic purposes. But for
+extremely sensitive purposes, particularly in environments where the
+blocking entropy sources are supported by hardware entropy generators,
+this option may be useful.
+
+The default is to use a non-blocking source.
+
+    my $nb_rng = Bytes::Random::Secure::Tiny->new(bits=>4096, nonblocking=>1);
+    my $bl_rng = Bytes::Random::Secure::Tiny->new(bits=>4096, nonblocking=>0);
+
+=back
 
 =head2 bytes
 
     my $random_bytes = $rng->bytes($n);
 
-Returns a string of C<$n> random bytes.  C<$n> should be a positive
-integer.
+Returns a string of C<$n> random bytes. C<$n> should be a positive integer.
 
 =head2 string_from
 
@@ -606,23 +639,36 @@ C<< 0 <= x <= 2**32-1 >>.
 
 There is nothing to configure.
 
-=head2 OPTIONAL DEPENDENCY
+=head2 OPTIONAL DEPENDENCIES
 
-If performance is a consideration, you may also install 
-L<Math::Random::ISAAC::XS>. Bytes::Random::Secure::Tiny will silently
-upgrade to use C<Math::Random::ISAAC::XS>, which implements the same
-algorithm, but in C and XS for speed.
+C<Bytes::Random::Secure::Tiny> uses an embedded version of the ISAAC
+algorithm adapted from L<Math::Random::ISAAC> as its CSPRNG, but will
+silently upgrade to using L<Math::Random::ISAAC> proper if it is available
+on the target system.
+
+C<Bytes::Random::Secure::Tiny> seeds using an embedded adaptation of
+L<Crypt::Random::Seed>, but it will silently upgrade to using
+L<Crypt::Random::Seed> proper if it is available on the target system.
+
+If performance is a consideration and you are able to install
+L<Math::Random::ISAAC::XS>, do so; L<Bytes::Random::Secure::Tiny> will
+silently upgrade to using C<Math::Random::ISAAC::XS> instead of the
+embedded ISAAC CSPRING. L<Math::Random::ISAAC::XS> implements the same
+ISAAC CSPRNG algorithm in C and XS for speed.
 
 =head1 CAVEATS
 
 =head2 FORK AND THREAD SAFETY
 
 When programming for parallel computation, create a unique
-C<Bytes::Random::Secure::Tiny> object within each process or thread. 
+C<Bytes::Random::Secure::Tiny> object within each process or thread.
 Bytes::Random::Secure::Tiny uses a CSPRNG, and sharing the same RNG between
 threads or processes will share the same seed and the same starting point. By
 instantiating the B::R::S::T object after forking or creating threads, a
 unique randomness stream will be created per thread or process.
+
+Always share the same RNG object between all non-concurrent consumers within
+a process, but never share the same RNG between threads or forked processes.
 
 =head2 STRONG RANDOMNESS
 
@@ -662,18 +708,14 @@ In order to eliminate all non-core dependencies, this module inlines code
 adapted from L<Math::Random::ISAAC> and L<Crypt::Random::Seed>.
 
 The source of cryptographically secure pseudo-random data supplied by this
-module comes from the ISAAC algorithm.  The ISAAC CSPRNG is seeded using
+module comes from the ISAAC algorithm. The ISAAC CSPRNG is seeded using
 algorithms adapted from C<Crypt::Random::Seed>. There are no known weaknesses
 in the ISAAC algorithm, and the algorithms adapted from Crypt::Random::Seed
 do a very good job of assuring the CSPRNG is well seeded.
 
-This module requires Perl 5.6 or newer. Unicode support in C<string_from> is
+This module requires Perl 5.8 or newer. Unicode support in C<string_from> is
 best with Perl 5.8.9 or newer. See the INSTALLATION section in this document
 for details.
-
-If L<Test::Warn> is installed, test coverage is 100%.  For those who don't want
-to bother installing Test::Warn, you can just take our word for it. It's an
-optional installation dependency.
 
 =head2 BLOCKING ENTROPY SOURCE
 
@@ -682,15 +724,6 @@ entropy source might not have enough entropy in reserve to generate the seed
 requested by this module without blocking. In such cases, the blocking will
 time out after approximately two seconds, and seeding will fall back to
 a strong non-blocking source.
-
-This module seeds as lazily as possible so that using the module, and even
-instantiating a Bytes::Random::Secure::Tiny object will not trigger reads from
-C</dev/random>. Only the first time the object is used to deliver random bytes
-will the RNG be seeded. Long-running scripts may prefer to force early seeding
-as close to start-up time as possible, rather than allowing it to happen later
-in a program's run-time. This can be achieved simply by invoking any of the
-methods that return a random byte. As soon as a random byte is requested for 
-the first time, the CSPRNG will be seeded.
 
 =head2 UNICODE SUPPORT
 
@@ -704,28 +737,20 @@ when the outcome isn't as expected.  ...this is to be expected.  Upgrade.
 
 =head2 MODULO BIAS
 
-Care is taken so that there is no modulo bias in the randomness returned
-either by C<bytes> or its siblings, nor by C<string_from>. As a matter of
-fact, this is exactly I<why> the C<string_from> method is preferable to
-a home-grown solution. However, the algorithm to eliminate modulo bias can
-impact the performance of the C<string_from> method. Any time the length of the
-bag string is significantly less than the nearest greater or equal factor
-of 2**32, performance will degrade. Unfortunately there is no known algorithm
-that improves upon this situation. Fortunately, for sanely sized strings, it's
-a minor issue. To put it in perspective, even in the case of passing a "bag"
-string of length 2**31 (which is huge), the expected time to return random
-bytes will only double.
+Care is taken so that there is no modulo bias in the randomness returned.
+As a matter of fact, this is exactly I<why> the C<string_from> method is
+preferable to a home-grown random string solution. However, the algorithm to
+eliminate modulo bias can impact the performance of the C<string_from>
+method. Any time the length of the bag string is significantly less than the
+nearest greater or equal factor of 2**32, performance will degrade.
+Unfortunately there is no known algorithm that improves upon this situation.
+Fortunately, for sanely sized strings, it's a minor issue. To put it in
+perspective, even in the case of passing a "bag" string of length 2**31
+(which is huge), the expected time to return random bytes will only double.
 
 =head1 INSTALLATION
 
-This module should install without any fuss on modern versions of Perl. For
-older Perl versions (particularly 5.6 and early 5.8.x's), it may be necessary
-to update your CPAN installer to a more modern version before installing this
-this module.
-
-Test coverage for Bytes::Random::Secure is 100% (per Devel::Cover) on any
-system that has L<Test::Warn> installed. But to keep the module light-weight,
-Test::Warn is not dragged in by default at installation time.
+No special requirements.
 
 =head1 AUTHOR
 
@@ -733,10 +758,10 @@ David Oswald C<< <davido [at] cpan (dot) org> >>
 
 =head1 BUGS
 
-Please report any bugs or feature requests to 
-C<bug-bytes-random-secure at rt.cpan.org>, or through the web interface at 
-L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Bytes-Random-Secure>.  I will 
-be notified, and then you'll automatically be notified of progress on your bug 
+Please report any bugs or feature requests to
+C<bug-bytes-random-secure at rt.cpan.org>, or through the web interface at
+L<http://rt.cpan.org/NoAuth/ReportBug.html?Queue=Bytes-Random-Secure-Tiny>.  I will
+be notified, and then you'll automatically be notified of progress on your bug
 as I make changes.
 
 =head1 SUPPORT
@@ -750,44 +775,37 @@ You can also look for information at:
 
 =over 4
 
-=item * Github Repo: L<https://github.com/daoswald/Bytes-Random-Secure>
+=item * Github Repo: L<https://github.com/daoswald/Bytes-Random-Secure-Tiny>
 
 =item * RT: CPAN's request tracker (report bugs here)
 
-L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Bytes-Random-Secure>
+L<http://rt.cpan.org/NoAuth/Bugs.html?Dist=Bytes-Random-Secure-Tiny>
 
 =item * AnnoCPAN: Annotated CPAN documentation
 
-L<http://annocpan.org/dist/Bytes-Random-Secure>
+L<http://annocpan.org/dist/Bytes-Random-Secure-Tiny>
 
 =item * CPAN Ratings
 
-L<http://cpanratings.perl.org/d/Bytes-Random-Secure>
+L<http://cpanratings.perl.org/d/Bytes-Random-Secure-Tiny>
 
 =item * Search CPAN
 
-L<http://search.cpan.org/dist/Bytes-Random-Secure/>
+L<http://search.cpan.org/dist/Bytes-Random-Secure-Tiny/>
 
 =back
 
 =head1 ACKNOWLEDGEMENTS
 
 Dana Jacobsen ( I<< <dana@acm.org> >> ) for his work that led to
-L<Crypt::Random::Seed>, thereby significantly reducing the dependencies while
-improving the portability and backward compatibility of this module.  Also for
-providing a patch to this module that greatly improved the performance
-of C<random_bytes>.
-
-Dana Jacosen also provided extensive input, code reviews, and testing that 
-helped to guide the direction this module has taken.  The code for the
-FIPS-140-1 tests was taken directly from L<Crypt::Random::TESHA2>.  Thanks!
+L<Crypt::Random::Seed>, and for ideas and code reviews.
 
 L<Bytes::Random> for implementing a nice, simple interface that this module
 patterns itself after.
 
 =head1 LICENSE AND COPYRIGHT
 
-Copyright 2012 David Oswald.
+Copyright 2015 David Oswald.
 
 This program is free software; you can redistribute it and/or modify it
 under the terms of either: the GNU General Public License as published

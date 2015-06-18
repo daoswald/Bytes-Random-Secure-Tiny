@@ -14,7 +14,7 @@ my @methods = qw/ bytes bytes_hex string_from /;
 
 can_ok( 'Bytes::Random::Secure::Tiny', @methods );
 
-my $r = Bytes::Random::Secure::Tiny->new(64);
+my $r = Bytes::Random::Secure::Tiny->new(bits => 64);
 
 foreach my $want ( qw/ 0 1 2 3 4 5 6 7 8 16 17 1024 10000 / ) {
   my $correct = $want >= 0 ? $want : 0;

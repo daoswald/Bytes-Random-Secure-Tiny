@@ -12,7 +12,7 @@ $ENV{'BRST_DEBUG'} = 1;
 
 # We'll use a weaker source because we're testing for function, quality
 # isn't being contested here.
-my $random = Bytes::Random::Secure::Tiny->new(64);
+my $random = Bytes::Random::Secure::Tiny->new(bits=>64);
 
 for my $count ( 0 .. 11 ) {
   is( scalar @{[ $random->_ranged_randoms(16,$count) ]}, $count,

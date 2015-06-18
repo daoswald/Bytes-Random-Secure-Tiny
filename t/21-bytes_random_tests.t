@@ -16,7 +16,7 @@ if ( $@ ) {
 use Bytes::Random::Secure::Tiny;
 
 # Default seed entropy of 8 longs is more than we need in testing.
-my $random = Bytes::Random::Secure::Tiny->new(64);
+my $random = Bytes::Random::Secure::Tiny->new(bits=>64);
 
 for( 1..40 ) {
   is(

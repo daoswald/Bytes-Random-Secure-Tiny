@@ -19,7 +19,7 @@ binmode STDOUT, ':encoding(UTF-8)';
 
 my $num_octets = 80;
 
-my $random = Bytes::Random::Secure::Tiny->new(64);
+my $random = Bytes::Random::Secure::Tiny->new(bits=>64);
 
 my $string = $random->string_from( 'Ѧѧ', $num_octets );
 
