@@ -20,7 +20,7 @@ plan tests => 3 * $no_bins;
 sub runtest {
   my ($rng) = @_;
 
-  my $tester = Statistics::Test::RandomWalk->new();
+  my $tester = Statistics::Test::RandomWalk->new;
   $tester->set_data(sub { $rng->irand/4294967296.0 }, 1_000_000);
 
   my ($quant, $got, $expected) = $tester->test($no_bins);
@@ -37,7 +37,7 @@ sub runtest {
   }
 }
 
-runtest(Math::Random::ISAAC::PP::Embedded->new());
+runtest(Math::Random::ISAAC::PP::Embedded->new);
 
 # First 32 bits of fractional parts of cube roots of 64 primes (2..311)
 # Copied from the SHA256 algorithm :-)

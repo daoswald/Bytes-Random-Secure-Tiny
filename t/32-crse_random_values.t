@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use Test::More;
 use Bytes::Random::Secure::Tiny;
+$Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
 
 my $src = Crypt::Random::Seed::Embedded->new(NonBlocking=>1);
 
