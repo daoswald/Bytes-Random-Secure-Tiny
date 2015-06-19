@@ -187,7 +187,6 @@ use warnings;
 use Carp ();
 
 our $VERSION = '1.004'; # IE, based on the CPAN version by similar name.
-
 use constant {
     randrsl => 0, randcnt => 1, randmem => 2,
     randa   => 3, randb   => 4, randc   => 5,
@@ -335,6 +334,7 @@ use warnings;
 use Carp ();
 
 our $VERSION = '1.004'; # Based on the CPAN version by similar name.
+use constant _backend => 0;
 
 my %CSPRNG = (
     XS  => 'Math::Random::ISAAC::XS',
@@ -342,21 +342,17 @@ my %CSPRNG = (
     EM  => 'Math::Random::ISAAC::PP::Embedded',
 );
 
-use constant _backend => 0;
 
 sub new {
     my ($class, @seed) = @_;
-
     our $EMBEDDED_CSPRNG =
         defined $EMBEDDED_CSPRNG             ? $EMBEDDED_CSPRNG             :
         defined $ENV{'BRST_EMBEDDED_CSPRNG'} ? $ENV{'BRST_EMBEDDED_CSPRNG'} : 0;
-
     my $DRIVER =
         $EMBEDDED_CSPRNG                          ? $CSPRNG{'EM'} :
         eval {require Math::Random::ISAAC::XS; 1} ? $CSPRNG{'XS'} :
         eval {require Math::Random::ISAAC::PP; 1} ? $CSPRNG{'PP'} :
                                                     $CSPRNG{'EM'};
-
     return bless [$DRIVER->new(@seed)], $class;
 }
 
