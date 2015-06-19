@@ -27,10 +27,7 @@ sub new {
                  = ( $name,  $rsub,     $isblocking,  $isstrong );
         last;
     }
-
-    # uncoverable branch true
-    return unless defined $self->{SourceSub};
-    return bless $self, $class;
+    return defined $self->{SourceSub} ? bless $self, $class : ();
 }
 
 sub random_values {
@@ -41,17 +38,14 @@ sub random_values {
 }
 
 sub _try_dev_urandom {
-    # uncoverable branch true
     return unless -r "/dev/urandom";
     return ('/dev/urandom', sub { __read_file('/dev/urandom', @_); }, 0, 0);
 }
 
 sub _try_dev_random {
-    return unless -r "/dev/random"; # uncoverable branch true
-    # uncoverable branch true
-    my $blocking = ($^O eq 'freebsd') ? 0 : 1; 
-    return ('/dev/random', sub { __read_file('/dev/random', @_); },
-            $blocking, 1);
+    return unless -r "/dev/random";
+    my $blocking = $^O eq 'freebsd' ? 0 : 1;
+    return ('/dev/random', sub {__read_file('/dev/random', @_)}, $blocking, 1);
 }
 
 sub __read_file {
@@ -64,7 +58,6 @@ sub __read_file {
         my $thisread = sysread $fh, $buffer, $nbytes-$nread;
         # Count EOF as an error.
         croak "Error reading $file: $!\n"
-            # uncoverable branch true
             unless defined $thisread && $thisread > 0;
         $s .= $buffer;
         $nread += length($buffer);
@@ -75,10 +68,9 @@ sub __read_file {
 }
 
 sub _try_win32 {
-    # uncoverable branch true
     return unless $^O eq 'MSWin32';
     eval { require Win32; require Win32::API; require Win32::API::Type; 1; }
-        or return; # uncoverable statement
+        or return;
 
     use constant CRYPT_SILENT      => 0x40;       # Never display a UI.
     use constant PROV_RSA_FULL     => 1;          # Which service provider.
@@ -134,8 +126,7 @@ _RTLGENRANDOM_PROTO_
 sub _try_egd {
     my @devices
         = qw(/var/run/egd-pool /dev/egd-pool /etc/egd-pool /etc/entropy);
-    # uncoverable subroutine
-    foreach my $device (@devices) { # uncoverable statement
+    foreach my $device (@devices) {
         next unless -r $device && -S $device;
         eval { require IO::Socket; 1; } or return;
         my $socket = IO::Socket::UNIX->new(Peer => $device, Timeout => 1);
@@ -161,8 +152,7 @@ sub _try_egd {
 }
 
 sub __read_egd {
-    # uncoverable subroutine
-    my ($device, $nbytes) = @_; # uncoverable statement
+    my ($device, $nbytes) = @_;
     return unless defined $device;
     return unless defined $nbytes && int($nbytes) > 0;
     croak "$device doesn't exist!" unless -r $device && -S $device;
@@ -352,6 +342,8 @@ my %CSPRNG = (
     EM  => 'Math::Random::ISAAC::PP::Embedded',
 );
 
+use constant _backend => 0;
+
 sub new {
     my ($class, @seed) = @_;
 
@@ -364,13 +356,11 @@ sub new {
         eval {require Math::Random::ISAAC::XS; 1} ? $CSPRNG{'XS'} :
         eval {require Math::Random::ISAAC::PP; 1} ? $CSPRNG{'PP'} :
                                                     $CSPRNG{'EM'};
-    Carp::carp("Using backend $DRIVER\n")
-        if $EMBEDDED_CSPRNG && $ENV{'BRST_DEBUG'};
 
-    return bless { '_backend' => $DRIVER->new(@seed) }, $class;
+    return bless [$DRIVER->new(@seed)], $class;
 }
 
-sub irand {shift->{_backend}->irand}
+sub irand {shift->[_backend]->irand}
 
 1;
 
