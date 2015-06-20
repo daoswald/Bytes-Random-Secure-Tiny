@@ -1,0 +1,6 @@
+Revision history for Bytes::Random::Secure::Tiny
+
+1.000 2015-06-20
+  - Initial CPAN release.
+  - Based on Bytes::Random::Secure, Crypt::Random::Seed,
+    and Math::Random::ISAAC
