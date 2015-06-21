@@ -14,7 +14,7 @@ use Carp qw/carp croak/;
 
 ## no critic (constant)
 
-our $VERSION = '1.000';
+our $VERSION = '1.001';
 use constant UINT32_SIZE => 4;
 
 sub new {
@@ -191,7 +191,7 @@ use strict;
 use warnings;
 use Carp ();
 
-our $VERSION = '1.000';
+our $VERSION = '1.001';
 use constant {
     randrsl => 0, randcnt => 1, randmem => 2,
     randa   => 3, randb   => 4, randc   => 5,
@@ -218,7 +218,7 @@ sub irand {
         $self->_isaac;
         $self->[randcnt] = 255;
     }
-    return $self->[randrsl][$self->[randcnt]];
+    return sprintf('%u', $self->[randrsl][$self->[randcnt]]);
 }
 
 ## no critic (RequireNumberSeparators,ProhibitCStyleForLoops)
@@ -337,7 +337,7 @@ use strict;
 use warnings;
 use Carp ();
 
-our $VERSION = '1.000';
+our $VERSION = '1.001';
 use constant _backend => 0;
 
 my %CSPRNG = (
@@ -371,7 +371,7 @@ use 5.006000;
 use Carp;
 use Hash::Util;
 
-our $VERSION = '1.000';
+our $VERSION = '1.001';
 
 # See Math::Random::ISAAC https://rt.cpan.org/Public/Bug/Display.html?id=64324
 use constant SEED_SIZE => 256; # bits; eight 32-bit words.

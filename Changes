@@ -1,5 +1,9 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.001 2015-06-21
+  - Revert PP::irand to using sprintf.
+  - Fix dependency tests so Windows dependencies are tested.
+
 1.000 2015-06-20
   - Initial CPAN release.
   - Based on Bytes::Random::Secure, Crypt::Random::Seed,

@@ -5,8 +5,12 @@ use warnings;
 use Test::More;
 
 BEGIN {
-    use_ok('Math::Random::ISAAC');
-    use_ok('Crypt::Random::Seed');
+    plan skip_all => 'Dependency testing only applies to Win32'
+        unless $^O eq 'MSWin32';
+
+    use_ok 'Win32';
+    use_ok 'Win32::API';
+    use_ok 'Win32::API::Type';
 }
 
 done_testing();
