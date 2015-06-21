@@ -32,4 +32,4 @@ my @directories = qw{  blib/  t/  };
 
 Test::Perl::Critic::all_critic_ok(@directories);
 
-done_testing();
+# done_testing();
