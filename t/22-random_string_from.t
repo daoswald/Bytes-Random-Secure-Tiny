@@ -8,7 +8,6 @@ use Test::More;
 use Bytes::Random::Secure::Tiny;
 
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
-$ENV{'BRST_DEBUG'} = 1;
 
 # We'll use a weaker source because we're testing for function, quality
 # isn't being contested here.

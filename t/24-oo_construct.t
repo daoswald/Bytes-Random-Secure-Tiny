@@ -13,7 +13,6 @@ use Bytes::Random::Secure::Tiny;
 can_ok( 'Bytes::Random::Secure::Tiny', qw/ new / );
 
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
-$ENV{'BRST_DEBUG'} = 1;
 
 # Instantiate with a dummy callback so we don't drain entropy.
 my $random = new_ok 'Bytes::Random::Secure::Tiny' => [Bits=>128,NonBlocking=>1];

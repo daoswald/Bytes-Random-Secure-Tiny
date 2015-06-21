@@ -1,3 +1,5 @@
+## no critic (ProhibitMultiplePackages,RequireFilenameMatchesPackage)
+
 # Bytes::Random::Secure::Tiny: A single source file implementation of
 # Bytes::Random::Secure, and its dependencies.
 
@@ -459,29 +461,26 @@ cryptographically-secure random bytes.
     my $rng = Bytes::Random::Secure->new; # Seed with 256 bits.
 
     my $bytes  = $rng->bytes(32);        # A string of 32 random bytes.
-    my $long   = $rng->irand;            # 32-bit random integer.
-    my $hex    = $rng->hex_digits(10);   # Ten hex digits.
+    my $long   = $rng->irand;            # 32-bit random unsigned integer.
+    my $hex    = $rng->hex_digits(10);   # Ten hex digits (lower-case).
     my $string = $rng->string_from('abc', 10); Random string from a, b, & c.
 
 
 =head1 DESCRIPTION
 
-L<Bytes::Random::Secure> provides random bytes from a cryptographically secure
-random number generator (ISAAC), seeded from strong entropy sources on a wide
-variety of platforms. It is configurable, and has a flexible user interface.
+L<Bytes::Random::Secure::Tiny> provides random bytes from a cryptographically
+secure random number generator (ISAAC), seeded from strong entropy sources on
+a wide variety of platforms. It does so without external dependencies (except
+on Windows), and has a minimal but useful user interface patterned after the
+module L<Bytes::Random::Secure>.
 
-But it has a handful of dependencies. And its UI may be bigger than a typical
-user needs.  L<Bytes::Random::Secure::Tiny> is designed to provide what 90% of
-Bytes::Random::Secure's users need, but with a simpler user interface, almost
-no configuration, and in a single module with no dependencies beyond core Perl.
+L<Bytes::Random::Secure> has a handful of dependencies. And its UI may be
+bigger than a typical user needs. L<Bytes::Random::Secure::Tiny> is designed
+to provide what 90% of Bytes::Random::Secure's users need, but with a simpler
+user interface, and in a single module with no dependencies beyond core Perl.
 
-In many cases this module may be used as a drop-in replacement for
-L<Bytes::Random::Secure>. This module uses a cryptographic quality random
-number generator that uses the ISAAC algorithm, adapted from
-L<Math::Random::ISAAC>, and should be suitable for cryptographic purposes.
-The harder problem to solve is how to seed the generator. This module uses
-an approach adapted from L<Crypt::Random::Seed> to generate the initial
-seeds for the ISAAC CSPRNG.
+In most cases this module may be used as a light-weight drop-in replacement
+for L<Bytes::Random::Secure>.
 
 =head1 RATIONALE
 
@@ -514,6 +513,10 @@ generator based on the seed. It has taken significant research to come up with
 a strong and sensible choice of established and published algorithms. The
 interface is designed with minimalism and simplicity in mind.
 
+In particular, the CSPRNG is based on the same algorithm used by 
+L<Math::Random::ISAAC>, and the seeding is based on algorithms from 
+L<Crypt::Random::Seed>.
+
 Furthermore, this module runs its randomness through both statistical tests
 and NIST L<FIPS-140|https://en.wikipedia.org/wiki/FIPS_140> tests to verify
 integrity.
@@ -531,8 +534,6 @@ Nothing is exported.
 =head2 new
 
     my $rng = Bytes::Random::Secure::Tiny->new;
-    my $rng = Bytes::Random::Secure::Tiny->new(bits => 128);
-    my $rng = Bytes::Random::Secure::Tiny->new(nonblocking => 0);
 
 Instantiate the pseudo-random number generator object. The seeding of the ISAAC
 CSPRING defaults to 256 bits from a non-blocking entropy source. The CSPRNG
@@ -548,10 +549,15 @@ Parameters described below are optional and case-insensitive.
 
 =item bits
 
+    my $rng = Bytes::Random::Secure::Tiny->new(bits => 512);
+
 Number of bits to use in seeding. Must be a value between 64 and 8192
 inclusive, and must satisfy C<bits=2**n>.  The default value is 256.
 
 =item nonblocking
+
+    my $nb_rng = Bytes::Random::Secure::Tiny->new(nonblocking=>1);
+    my $bl_rng = Bytes::Random::Secure::Tiny->new(nonblocking=>0);
 
 If set to a false value, a blocking entropy source may be used in seeding. This
 is generally not necessary, as the non-blocking sources used are considered by 
@@ -559,16 +565,12 @@ most to be strong enough for cryptographic purposes. But for extremely
 sensitive purposes, or in environments where the blocking entropy sources are
 supported by hardware entropy generators, this option may be useful.
 
-The default is to use a non-blocking source.
-
-    my $nb_rng = Bytes::Random::Secure::Tiny->new(bits=>4096, nonblocking=>1);
-    my $bl_rng = Bytes::Random::Secure::Tiny->new(bits=>4096, nonblocking=>0);
-
 Instantiating with a blocking source can exhaust system entropy (this has been
 seen in testing), and in such cases C<new> will block until sufficient entropy
-is generated. This issue can be mitigated by dedicated entropy-generating
-hardware devices. Unless such a device is installed on the target system, it
-is probably best to accept the default non-blocking behavior.
+is generated.
+
+The default is to use a non-blocking source, and you should probably accept
+that default.
 
 =back
 
@@ -576,7 +578,7 @@ is probably best to accept the default non-blocking behavior.
 
     my $random_bytes = $rng->bytes($n);
 
-Returns a string of C<$n> random bytes. C<$n> should be a positive integer.
+Returns a string of C<$n> random bytes. C<$n> must be a positive integer.
 
 =head2 string_from
 
@@ -589,9 +591,9 @@ ten octets from 'abcdefg').
 
     my $random_hex = $rng->bytes_hex(12);
 
-Returns a string of hex digits. Remember that each byte is represented by two
-hex digits. Therefore, C<<$rng->bytes_hex(1)>> will return a string of length
-2, such as C<7F>.
+Returns a string of hex digits. Each byte is represented by two lower-cased hex
+digits. Therefore, C<<$rng->bytes_hex(1)>> will return a string of length 2,
+such as C<7F>. There is no C<0x> prepended to the hex digits.
 
 =head2 irand
 
@@ -682,7 +684,8 @@ just as you would hope. But some versions of Perl older than 5.8.9 exhibited
 varying degrees of bugginess in their handling of Unicode. If you're depending
 on the Unicode features of this module while using Perl versions older than
 5.8.9 be sure to test thoroughly, and don't be surprised when the outcome isn't
-as expected. ...this is to be expected. Upgrade.
+as expected. ...this is to be expected. Upgrade. This module works at the 
+octet level, not grapheme cluster.
 
 =head1 MODULO BIAS
 

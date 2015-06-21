@@ -26,9 +26,6 @@ if ($EVAL_ERROR) {
     plan( skip_all => $msg );
 }
 
-# Set a higher severity level.  Note: List/BinarySearch.pm meets level 2.
-Test::Perl::Critic->import( -severity => 4 );
-
 # We want to test the primary module components (blib/) as well as the
 # test suite (t/).
 my @directories = qw{  blib/  t/  };

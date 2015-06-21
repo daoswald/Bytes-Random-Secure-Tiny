@@ -9,7 +9,7 @@ use Test::More;
 use Bytes::Random::Secure::Tiny;
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG=1;
 
-eval 'require Statistics::Test::RandomWalk; 1;'
+eval 'require Statistics::Test::RandomWalk; 1;' ## no critic (eval)
     or plan skip_all => 
         'Statistics::Test::RandomWalk not available for testing.';
 

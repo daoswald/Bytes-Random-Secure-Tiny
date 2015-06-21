@@ -10,7 +10,6 @@ use Test::More;
 use Bytes::Random::Secure::Tiny;
 
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
-$ENV{'BRST_DEBUG'} = 1;
 
 # Public methods tested here (bytes(), etc.).
 # Much of this has already been put through the paces via the "functions" layer

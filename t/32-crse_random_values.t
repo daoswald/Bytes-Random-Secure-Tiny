@@ -39,7 +39,12 @@ my $src = Crypt::Random::Seed::Embedded->new(NonBlocking=>1);
 my @seeds = Crypt::Random::Seed::Embedded->new->random_values(2);
 is scalar @seeds, 2, "random_values(2) returns two values";
 
-my @bseeds = Crypt::Random::Seed::Embedded->new(nonblocking=>0)->random_values(2);
-is scalar @seeds, 2, 'non-blocking random_values(2) returned two values.';
-
+if( $ENV{RELEASE_TESTING} ) {
+    my @bseeds
+        = Crypt::Random::Seed::Embedded->new(nonblocking=>0)->random_values(2);
+    is scalar @seeds, 2, 'non-blocking random_values(2) returned two values.';
+}
+else {
+    note 'Skipping blocking tests unless in RELEASE_TESTING mode.';
+}
 done_testing();
