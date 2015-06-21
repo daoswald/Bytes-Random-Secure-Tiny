@@ -5,6 +5,15 @@ use ExtUtils::MakeMaker;
 
 my %PREREQ_PM = (
 );
+if ( $^O eq 'MSWin32' ) {
+    my $api_version = (~0 > 281474976710656) ? 0.62 : 0;
+    %PREREQ_PM = (
+        %PREREQ_PM,
+        'Win32'             => 0,
+        'Win32::API'        => $api_version,
+        'Win32::API::Type'  => 0,
+    );
+}
 
 WriteMakefile(
     NAME          => 'Bytes::Random::Secure::Tiny',
