@@ -14,7 +14,7 @@ cryptographically-secure random bytes.
     my $bytes  = $rng->bytes(32);        # A string of 32 random bytes.
     my $long   = $rng->irand;            # 32-bit random unsigned integer.
     my $hex    = $rng->hex_digits(10);   # Ten hex digits (lower-case).
-    my $string = $rng->string_from('abc', 10); Random string from a, b, & c.
+    my $string = $rng->string_from('abc', 10); # Random string from a, b, & c.
 
 
 =head1 DESCRIPTION
