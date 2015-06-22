@@ -1,5 +1,9 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.003 2015-06-22
+  - Fix POD formatting issue.
+  - Split POD into separate file.
+
 1.002 2015-06-21
   - Set default seed to /dev/urandom, not /dev/random.
 

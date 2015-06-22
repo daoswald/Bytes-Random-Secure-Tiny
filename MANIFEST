@@ -1,6 +1,7 @@
 MANIFEST.SKIP
 Changes
 lib/Bytes/Random/Secure/Tiny.pm
+lib/Bytes/Random/Secure/Tiny.pod
 LICENSE
 Makefile.PL
 MANIFEST			This list of files
