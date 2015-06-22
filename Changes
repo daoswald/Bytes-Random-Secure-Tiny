@@ -1,5 +1,8 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.002 2015-06-21
+  - Set default seed to /dev/urandom, not /dev/random.
+
 1.001 2015-06-21
   - Revert PP::irand to using sprintf.
   - Fix dependency tests so Windows dependencies are tested.

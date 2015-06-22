@@ -26,3 +26,5 @@ MYMETA\b
 ^cover_db/
 ^nytprof/
 ^nytprof\.out
+^Bytes-Random-Secure-Tiny-.+/
+^Bytes-Random-Secure-Tiny-.+\.gz

@@ -1,3 +1,4 @@
+MANIFEST.SKIP
 Changes
 lib/Bytes/Random/Secure/Tiny.pm
 LICENSE

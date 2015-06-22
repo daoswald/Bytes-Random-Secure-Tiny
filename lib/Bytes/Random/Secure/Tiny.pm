@@ -14,12 +14,14 @@ use Carp qw/carp croak/;
 
 ## no critic (constant)
 
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use constant UINT32_SIZE => 4;
 
 sub new {
     my ($class, %params) = @_;
     $params{lc $_} = delete $params{$_} for keys %params;
+    $params{nonblocking}
+        = defined $params{nonblocking} ? $params{nonblocking} : 1;
     my $self = {};
     my @methodlist
         = ( \&_try_win32, \&_try_egd, \&_try_dev_random, \&_try_dev_urandom );
@@ -61,7 +63,6 @@ sub __read_file {
     my($s, $buffer, $nread) = ('', '', 0);
     while ($nread < $nbytes) {
         my $thisread = sysread $fh, $buffer, $nbytes-$nread;
-        # Count EOF as an error.
         croak "Error reading $file: $!\n"
             unless defined $thisread && $thisread > 0;
         $s .= $buffer;
@@ -191,7 +192,7 @@ use strict;
 use warnings;
 use Carp ();
 
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use constant {
     randrsl => 0, randcnt => 1, randmem => 2,
     randa   => 3, randb   => 4, randc   => 5,
@@ -337,7 +338,7 @@ use strict;
 use warnings;
 use Carp ();
 
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 use constant _backend => 0;
 
 my %CSPRNG = (
@@ -368,10 +369,10 @@ package Bytes::Random::Secure::Tiny;
 use strict;
 use warnings;
 use 5.006000;
-use Carp;
+use Carp qw(carp croak);
 use Hash::Util;
 
-our $VERSION = '1.001';
+our $VERSION = '1.002';
 
 # See Math::Random::ISAAC https://rt.cpan.org/Public/Bug/Display.html?id=64324
 use constant SEED_SIZE => 256; # bits; eight 32-bit words.
@@ -381,13 +382,13 @@ sub new {
     $args{lc $_} = delete $args{$_} for keys %args; # Convert args to lc names
     my $bits = SEED_SIZE; # Default: eight 32bit words.
     $bits = delete $args{bits} if exists $args{bits};
-    die "Number of bits must be 64 <= n <= 8192, and a multipe in 2^n: $bits"
+    croak "Number of bits must be 64 <= n <= 8192, and a multipe in 2^n: $bits"
         if $bits < 64 || $bits > 8192 || !_ispowerof2($bits);
     return Hash::Util::lock_hashref bless {
         bits => $bits,
         _rng => Math::Random::ISAAC::Embedded->new(do{
             my $source = Crypt::Random::Seed::Embedded->new(%args)
-                or die 'Could not get a seed source.';
+                or croak 'Could not get a seed source.';
             $source->random_values($bits/32);
         }),
     }, $class;
