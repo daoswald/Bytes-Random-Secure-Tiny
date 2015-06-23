@@ -14,20 +14,20 @@ $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
 my $random = Bytes::Random::Secure::Tiny->new(bits=>64);
 
 for my $count ( 0 .. 11 ) {
-  is( scalar @{[ $random->_ranged_randoms(16,$count) ]}, $count,
+  is( scalar @{$random->_ranged_randoms(16,$count)}, $count,
       "Requested $count ranged randoms, and got $count." );
 }
 
-is( scalar @{[ $random->_ranged_randoms(16) ]}, 0,
+is( scalar @{$random->_ranged_randoms(16)}, 0,
     'Requested undefined quantity of ranged randoms, and got zero (default).' );
 
 my( $min, $max );
-$min = $max = $random->_ranged_randoms(200, 1);
+$min = $max = @{$random->_ranged_randoms(200, 1)};
 
 my $MAX_TRIES = 1_000_000;
 my $tries     = 0;
 while( ( $min > 0 || $max < 199 ) && $tries++ < $MAX_TRIES ) {
-  my $random = ($random->_ranged_randoms(200,1))[0];
+  my $random = $random->_ranged_randoms(200,1)->[0];
   $min = $random < $min ? $random : $min;
   $max = $random > $max ? $random : $max;
 }

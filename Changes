@@ -1,5 +1,9 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.004 2015-06-23
+  - Makefile.PL now requires Perl 5.8.
+  - _ranged_randoms returns an arrayref rather than array (microoptiomization)
+
 1.003 2015-06-22
   - Fix POD formatting issue.
   - Split POD into separate file.

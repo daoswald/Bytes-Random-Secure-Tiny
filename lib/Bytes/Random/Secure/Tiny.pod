@@ -155,7 +155,7 @@ C<< 0 <= x <= 2**32-1 >>.
 
 =head1 CONFIGURATION
 
-There is nothing to configure.
+Nothing to configure.
 
 =head1 DEPENDENCIES
 
