@@ -11,7 +11,6 @@ use 5.006000;
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
 my @methods = qw/ bytes bytes_hex string_from /;
 
-
 can_ok( 'Bytes::Random::Secure::Tiny', @methods );
 
 my $r = Bytes::Random::Secure::Tiny->new(bits => 64);
@@ -21,8 +20,6 @@ foreach my $want ( qw/ 0 1 2 3 4 5 6 7 8 16 17 1024 10000 / ) {
   is( length $r->bytes( $want ), $correct,
       "bytes($want) method returns $correct bytes." );
 }
-
-
 
 # bytes_hex (and _lite) tests.
 
@@ -36,11 +33,8 @@ foreach my $want ( qw/ 0 1 2 3 4 5 6 7 8 16 17 1024 10000 / ) {
 ok( $r->bytes_hex(128) =~ /^[[:xdigit:]]+$/,
     'bytes_hex only produces hex digits.' );
 
-
 is( length $r->bytes(), 0,
     'random_bytes() No param defaults to zero bytes.' );
-
-
 
 # Basic tests for random_string_from
 # (More exhaustive tests in 22-random_string_from.t)

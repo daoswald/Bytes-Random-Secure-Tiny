@@ -10,7 +10,7 @@ package Crypt::Random::Seed::Embedded;
 use strict;
 use warnings;
 use Fcntl;
-use Carp qw/carp croak/;
+use Carp qw/croak/;
 
 ## no critic (constant)
 
@@ -190,7 +190,6 @@ package Math::Random::ISAAC::PP::Embedded;
 
 use strict;
 use warnings;
-use Carp ();
 
 our $VERSION = '1.003';
 use constant {
@@ -228,9 +227,7 @@ sub _isaac {
     my $self = shift;
     use integer;
 
-    my $mm = $self->[randmem];
-    my $r  = $self->[randrsl];
-    my $aa = $self->[randa];
+    my($mm, $r, $aa) = @{$self}[randmem,randrsl,randa];
     my $bb = ($self->[randb] + (++$self->[randc])) & 0xffffffff;
     my ($x, $y); # temporary storage
 
@@ -269,8 +266,7 @@ sub _randinit {
     use integer;
 
     my ($c, $d, $e, $f, $g, $h, $j, $k) = (0x9e3779b9)x8; # The golden ratio.
-    my $mm = $self->[randmem];
-    my $r  = $self->[randrsl];
+    my ($mm, $r) = @{$self}[randmem,randrsl];
 
     for (1..4) {
         $c ^= $d << 11;                     $f += $c;       $d += $e;
@@ -336,7 +332,6 @@ package Math::Random::ISAAC::Embedded;
 
 use strict;
 use warnings;
-use Carp ();
 
 our $VERSION = '1.003';
 use constant _backend => 0;
@@ -369,7 +364,7 @@ package Bytes::Random::Secure::Tiny;
 use strict;
 use warnings;
 use 5.006000;
-use Carp qw(carp croak);
+use Carp qw(croak);
 use Hash::Util;
 
 our $VERSION = '1.003';
