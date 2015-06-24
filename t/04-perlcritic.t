@@ -6,8 +6,6 @@ use warnings;
 use Test::More;
 use English qw( -no_match_vars );
 
-# To enable these tests one must set the RELEASE_TESTING environment variable
-# to a true value.
 # It's possible users would have their own conflicting Perl::Critic config, so
 # it would be a bad idea to make this test run automatically on users systems.
 
@@ -15,9 +13,6 @@ if ( not $ENV{RELEASE_TESTING} ) {
     my $msg = 'Author Test: Set $ENV{RELEASE_TESTING} to a true value to run.';
     plan( skip_all => $msg );
 }
-
-# We also don't want to force a dependency on Test::Perl::Critic, so if the
-# user doesn't have the module, we won't run the test.
 
 eval { require Test::Perl::Critic; 1; };
 
@@ -31,5 +26,3 @@ if ($EVAL_ERROR) {
 my @directories = qw{  blib/  t/  };
 
 Test::Perl::Critic::all_critic_ok(@directories);
-
-# done_testing();

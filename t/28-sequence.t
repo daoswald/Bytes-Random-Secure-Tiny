@@ -1,13 +1,9 @@
 #!/usr/bin/perl -T
 
 # Check the generated sequence against the reference implementation
-
 use strict;
 use warnings;
-
 use Test::More;
-
-# Test the Pure Perl version only; the XS version has its own tests
 use Bytes::Random::Secure::Tiny;
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;
 
@@ -136,7 +132,7 @@ my @results = (
 
 plan tests => scalar(@results);
 
-my $rng = Math::Random::ISAAC::PP::Embedded->new;
+my $rng = Math::Random::ISAAC::PP::Embedded->new; # Seed is zero-filled.
 
 foreach my $num (@results) {
   is($rng->irand(), $num);

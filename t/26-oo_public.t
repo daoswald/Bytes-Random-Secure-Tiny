@@ -2,11 +2,8 @@
 
 use strict;
 use warnings;
-
 use Data::Dumper;
-
 use Test::More;
-
 use Bytes::Random::Secure::Tiny;
 
 $Math::Random::ISAAC::Embedded::EMBEDDED_CSPRNG = 1;

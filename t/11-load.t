@@ -2,9 +2,7 @@
 
 use strict;
 use warnings;
-
 use Test::More tests => 4;
-
 
 BEGIN {
     use_ok( 'Bytes::Random::Secure::Tiny' ) || print "Bail out!\n";

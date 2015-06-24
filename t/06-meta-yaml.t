@@ -5,8 +5,7 @@ use warnings;
 use Test::More;
 
 if( $] lt '5.018000' ) {
-  plan skip_all =>
-    'YAML test not avaiable pre-5.18';
+  plan skip_all => 'YAML test not avaiable pre-5.18';
  exit(0);
 }
 

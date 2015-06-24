@@ -2,11 +2,8 @@
 
 use strict;
 use warnings;
-
 use Test::More;
-
 use Bytes::Random::Secure::Tiny;
-
 
 {
     my $rv = eval { Bytes::Random::Secure::Tiny->new(bits=>32) } || $@;
@@ -32,6 +29,5 @@ use Bytes::Random::Secure::Tiny;
     like $rv, qr/exceeds irand max limit of 2\^\^32/, 
         '_ranged_randoms: range size overflow dies.';
 }
-
 
 done_testing;

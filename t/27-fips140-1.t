@@ -31,9 +31,7 @@ use 5.006000;
 
 use strict;
 use warnings;
-
 use Test::More;
-
 use Bytes::Random::Secure::Tiny qw();
 use Time::HiRes qw/gettimeofday/;
 

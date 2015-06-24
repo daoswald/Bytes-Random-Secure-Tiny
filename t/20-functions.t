@@ -21,7 +21,7 @@ foreach my $want ( qw/ 0 1 2 3 4 5 6 7 8 16 17 1024 10000 / ) {
       "bytes($want) method returns $correct bytes." );
 }
 
-# bytes_hex (and _lite) tests.
+# bytes_hex tests.
 
 foreach my $want ( qw/ 0 1 2 3 4 5 6 7 8 16 17 1024 10000 / ) {
   my $result  = $r->bytes_hex( $want );
