@@ -3,10 +3,10 @@ use strict;
 use warnings;
 use ExtUtils::MakeMaker;
 
-use constant API_SIGNATURE => 281474976710656;
+use constant WINAPI_SIGNATURE => 281474976710656;
 
 my %PREREQ_PM = $^O eq 'MSWin32'
-    ? ('Win32' => 0, 'Win32::API' => (~0 > API_SIGNATURE ? 0.62 : 0),
+    ? ('Win32' => 0, 'Win32::API' => (~0 > WINAPI_SIGNATURE ? 0.62 : 0),
        'Win32::API::Type' => 0) 
     : ();
 

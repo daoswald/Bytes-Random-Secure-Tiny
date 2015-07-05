@@ -12,8 +12,8 @@ cryptographically-secure random bytes.
     my $rng = Bytes::Random::Secure->new; # Seed with 256 bits.
 
     my $bytes  = $rng->bytes(32);              # A string of 32 random bytes.
-    my $long   = $rng->irand;                  # 32-bit random unsigned integer.
-    my $hex    = $rng->hex_digits(10);         # Ten hex digits (lower-case).
+    my $long   = $rng->irand;                  # 32-bit random unsigned int.
+    my $hex    = $rng->bytes_hex(10);          # 10 randombytes as hex digits.
     my $string = $rng->string_from('abc', 10); # Random string from a, b, & c.
 
 
@@ -131,26 +131,32 @@ that default.
 
 Returns a string of C<$n> random bytes. C<$n> must be a positive integer.
 
-=head2 string_from
-
-    my $random_string = $rng->string_from('abcdefg', 10);
-
-Returns a string of random octets selected from the "Bag" string (in this case
-ten octets from 'abcdefg').
-
 =head2 bytes_hex
 
-    my $random_hex = $rng->bytes_hex(12);
+    my $random_hex = $rng->bytes_hex(6); # E.g. f35dde7c02a4
 
 Returns a string of hex digits. Each byte is represented by two lower-cased hex
 digits. Therefore, C<< $rng->bytes_hex(1) >> will return a string of length 2,
 such as C<7F>. There is no C<0x> prepended to the hex digits.
 
+=head2 string_from
+
+    my $random_string = $rng->string_from('abcdefg', 10);
+
+Returns a string of random octets selected from the "Bag" string (in this case
+ten octets from 'abcdefg'). Repeated bag characters are weighted according to
+their frequency. For example, given the bag 'aabc', the character 'a' will be
+selected approximately 50% of the time, though being I<random>, there are no
+guarantees it will be selected at all.  For the bag 'abc', each character has
+the same weight. The output may contain duplicate characters.  For example:
+
+    say $rng->string_from('a', 10); # Must always be 'aaaaaaaaaa'
+
 =head2 irand
 
     my $unsigned_long = $random->irand;
 
-Returns a pseudo-random 32-bit unsigned integer.  The value will satisfy
+Returns a pseudo-random 32-bit unsigned integer. The value will satisfy
 C<< 0 <= x <= 2**32-1 >>.
 
 =head1 CONFIGURATION

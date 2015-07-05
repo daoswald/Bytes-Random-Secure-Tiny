@@ -1,5 +1,8 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.005 2015-07-05
+  - Fixed a mistake in the SYNOPSIS. Improved description of string_from.
+
 1.004 2015-06-23
   - Makefile.PL now requires Perl 5.8.
   - _ranged_randoms returns an arrayref rather than array (microoptiomization)
