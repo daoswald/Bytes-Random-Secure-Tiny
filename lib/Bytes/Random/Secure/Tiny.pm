@@ -419,6 +419,16 @@ sub string_from {
     return $rand_bytes;
 }
 
+sub shuffle {
+    my($self, $aref) = @_;
+    croak 'Argument must be an array reference.' unless 'ARRAY' eq ref $aref;
+    for (my $i = @$aref; --$i;) {
+        my $r = $self->_ranged_randoms($i+1, 1)->[0];
+        ($aref->[$i],$aref->[$r]) = ($aref->[$r], $aref->[$i]);
+    }
+    return $aref;
+}
+
 sub _ranged_randoms {
     my ($self, $range, $count) = @_;
     $_ = defined $_ ? $_ : 0 for $count, $range;
