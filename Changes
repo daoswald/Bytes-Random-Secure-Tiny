@@ -1,5 +1,10 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.006 2015-07-??
+  - Fixed the META_MERGE entry in Makefile.PL - the 'meta-spec' part was
+    in the wrong place, so the repo wasn't appearing in the metadata.
+  - The ABSTRACT_FROM was referring to the .pm file rather than the .pod
+
 1.005 2015-07-05
   - Fixed a mistake in the SYNOPSIS. Improved description of string_from.
 
