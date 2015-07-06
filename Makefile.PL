@@ -14,7 +14,7 @@ WriteMakefile(
     NAME               => 'Bytes::Random::Secure::Tiny',
     AUTHOR             => q{David Oswald <davido@cpan.org>},
     VERSION_FROM       => 'lib/Bytes/Random/Secure/Tiny.pm',
-    ABSTRACT_FROM      => 'lib/Bytes/Random/Secure/Tiny.pm',
+    ABSTRACT_FROM      => 'lib/Bytes/Random/Secure/Tiny.pod',
     ($ExtUtils::MakeMaker::VERSION >= 6.3002 ? ('LICENSE' => 'perl') : ()),
     PL_FILES           => {},
     CONFIGURE_REQUIRES => {'ExtUtils::MakeMaker' => '6.56'},
