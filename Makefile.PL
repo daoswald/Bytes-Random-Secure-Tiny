@@ -22,11 +22,11 @@ WriteMakefile(
     MIN_PERL_VERSION   => '5.008000',
     PREREQ_PM          => \%PREREQ_PM,
     META_MERGE => {
+      'meta-spec' => {version => 2},
       'resources' => {
-        'meta-spec' => {version => 2},
         'repository' => {
           'url'  => 'git://github.com/daoswald/Bytes-Random-Secure-Tiny.git',
-          'web'  => 'http://github.com/daoswald/Bytes-Random-Secure-Tiny',
+          'web'  => 'https://github.com/daoswald/Bytes-Random-Secure-Tiny',
           'type' => 'git',
         },
       },

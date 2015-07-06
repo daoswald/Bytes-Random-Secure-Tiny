@@ -14,7 +14,7 @@ use Carp qw/croak/;
 
 ## no critic (constant)
 
-our $VERSION = '1.005';
+our $VERSION = '1.006';
 use constant UINT32_SIZE => 4;
 
 sub new {
