@@ -1,5 +1,5 @@
 {
-   "abstract" : "unknown",
+   "abstract" : "A tiny Perl extension to generate cryptographically-secure random bytes.",
    "author" : [
       "David Oswald <davido@cpan.org>"
    ],
@@ -38,9 +38,11 @@
    },
    "release_status" : "stable",
    "resources" : {
-      "x_Metaspec" : {
-         "version" : 2
+      "repository" : {
+         "type" : "git",
+         "url" : "git://github.com/daoswald/Bytes-Random-Secure-Tiny.git",
+         "web" : "https://github.com/daoswald/Bytes-Random-Secure-Tiny"
       }
    },
-   "version" : "1.005"
+   "version" : "1.006"
 }
