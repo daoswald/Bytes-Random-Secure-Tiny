@@ -21,4 +21,4 @@ requires:
   perl: '5.008000'
 resources:
   repository: git://github.com/daoswald/Bytes-Random-Secure-Tiny.git
-version: '1.006'
+version: '1.007'

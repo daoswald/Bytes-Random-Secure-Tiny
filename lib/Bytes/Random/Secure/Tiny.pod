@@ -164,27 +164,21 @@ C<< 0 <= x <= 2**32-1 >>.
     my $aref_shuffled = $random->shuffle($aref);
 
 Shuffles the contents of a reference to an array in sitiu, and returns
-the reference. This means that C<$aref> and C<$aref_shuffled> are the same
-reference, and that C<$aref> is shuffled in place.
+the same reference.
 
-L<List::Util> comes with a C<shuffle> function, but that shuffle is based on
-Perl's C<rand>, and thus, unsatisfactory for uses where a cryptographic
-quality C<rand> is required.  L<Bytes::Random::Secure::Tiny>'s C<shuffle>
-uses a CSPRNG for higher quality randomness.
+L<List::Util>, which ships with Perl, includes C<shuffle> function. But that
+function is flawed in two ways. First, from a cryptographic standpoint,
+it uses Perl's C<rand>, which is not a CSPRNG, and therefore is inadequate.
 
-Furthermore, the Fisher-Yates shuffle as implemented by List::Util suffers from
-a problem documented by Abigail in L<Algorithm::Numerical::Shuffle>: Perl's
-C<rand> is typically seeded using a 32-bit seed. Since a shuffle using a PRNG
-depends on three things (the seed, the algorithm, and the input), the outcome
-of a given shuffle is purely based on the seed.
-of the shuffle is purely based on the seed. This means that on a system with
-32-bit random numbers, there are at most 2^32 possible shuffles. But for a list
-of C<n> elements, there are C<n!> possible permutations. Consequently, a list
-as small as 13 elements cannot shuffle in certain permutations.
+Second, because Perl's rand has an internal state of just 32 bits, it cannot
+possibly generate all permutations of arrays containing 13 or more elements.
 
-This module's C<shuffle> benefits from large seeds and a huge internal state.
-ISAAC can be seeded with up to 8192 bits, yielding 2^8192 possible initial
-states, with 2^8288 possible internal states.
+This module's C<shuffle> uses a CSPRNG, and also benefits from large seeds
+and a huge internal state. ISAAC can be seeded with up to 8192 bits, yielding
+2^8192 possible initial states, and 2^8288 possible internal states. A seed of
+8192 bits will assure that for arrays of up to 966 elements every permutation
+is accessible.
+
 =head1 CONFIGURATION
 
 Nothing to configure.
