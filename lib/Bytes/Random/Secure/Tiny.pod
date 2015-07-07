@@ -13,7 +13,7 @@ cryptographically-secure random bytes.
 
     my $bytes  = $rng->bytes(32);              # A string of 32 random bytes.
     my $long   = $rng->irand;                  # 32-bit random unsigned int.
-    my $hex    = $rng->bytes_hex(10);          # 10 randombytes as hex digits.
+    my $hex    = $rng->bytes_hex(10);          # 10 random bytes as hex digits.
     my $string = $rng->string_from('abc', 10); # Random string from a, b, & c.
 
 
@@ -37,21 +37,18 @@ for L<Bytes::Random::Secure>.
 
 This module aims to provide a generalized tool for generating cryptographically
 secure randomness in a way that can fit into many applications while providing
-a zero dependency chain, and a user interface that is both minimal and simple.
-Common use-cases may include:
+a zero dependency toolchain, and a user interface that is both minimal and
+simple. Common use-cases may include:
 
 =over 4
 
-=item * Creating temporary passphrases using the C<string_from> method.
+=item * Creating temporary passphrases.
 
-=item * Generating per-account random salt to be hashed along with passphrases 
-to prevent rainbow table attacks.
+=item * Generating random salts.
 
-=item * Generating a secret that can be hashed along with a cookie's session
-content to prevent cookie forgeries.
+=item * Generating a secret that can be hashed along with session cookies.
 
-=item * Building raw cryptographic-quality pseudo-random data sets for testing
-or sampling.
+=item * Nonces. 
 
 =item * Feeding secure key-gen utilities.
 
@@ -92,7 +89,7 @@ object should be instantiated as infrequently as practical; there is no benefit
 to re-seeding, with the single cavaet that the CSPRNG object should not be
 shared by threads or forked processes.
 
-=head3 Constructor parameters
+=head3 Constructor Parameters
 
 Parameters described below are optional and case-insensitive.
 
@@ -103,7 +100,7 @@ Parameters described below are optional and case-insensitive.
     my $rng = Bytes::Random::Secure::Tiny->new(bits => 512);
 
 Number of bits to use in seeding. Must be a value between 64 and 8192
-inclusive, and must satisfy C<bits=2**n>.  The default value is 256.
+inclusive, and must satisfy C<bits==2**n>. The default value is 256.
 
 =item nonblocking
 
