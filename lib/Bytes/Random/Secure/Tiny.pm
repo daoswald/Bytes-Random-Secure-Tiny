@@ -14,7 +14,7 @@ use Carp qw/croak/;
 
 ## no critic (constant)
 
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use constant UINT32_SIZE => 4;
 
 sub new {
@@ -191,7 +191,7 @@ package Math::Random::ISAAC::PP::Embedded;
 use strict;
 use warnings;
 
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use constant {
     randrsl => 0, randcnt => 1, randmem => 2,
     randa   => 3, randb   => 4, randc   => 5,
@@ -333,7 +333,7 @@ package Math::Random::ISAAC::Embedded;
 use strict;
 use warnings;
 
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 use constant _backend => 0;
 
 my %CSPRNG = (
@@ -367,7 +367,7 @@ use 5.006000;
 use Carp qw(croak);
 use Hash::Util;
 
-our $VERSION = '1.006';
+our $VERSION = '1.007';
 
 # See Math::Random::ISAAC https://rt.cpan.org/Public/Bug/Display.html?id=64324
 use constant SEED_SIZE => 256; # bits; eight 32-bit words.
@@ -417,6 +417,16 @@ sub string_from {
     my $rand_bytes = q{}; # We need an empty, defined string.
     $rand_bytes .= substr $bag, $_, 1 for @{$self->_ranged_randoms($range, $bytes)};
     return $rand_bytes;
+}
+
+sub shuffle {
+    my($self, $aref) = @_;
+    croak 'Argument must be an array reference.' unless 'ARRAY' eq ref $aref;
+    for (my $i = @$aref; --$i;) {
+        my $r = $self->_ranged_randoms($i+1, 1)->[0];
+        ($aref->[$i],$aref->[$r]) = ($aref->[$r], $aref->[$i]);
+    }
+    return $aref;
 }
 
 sub _ranged_randoms {

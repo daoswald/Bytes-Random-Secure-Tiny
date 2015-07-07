@@ -1,5 +1,9 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.007 2015-07-07
+  - Added a shuffle method.
+  - Documentation tweaks.
+
 1.006 2015-07-06
   - Fixed the META_MERGE entry in Makefile.PL - the 'meta-spec' part was
     in the wrong place, so the repo wasn't appearing in the metadata.

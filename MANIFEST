@@ -33,3 +33,4 @@ t/32-crse_random_values.t
 t/33-crse_coverage.t
 t/34-brst-coverage.t
 t/35-mrie-cover.t
+t/36-shuffle.t
