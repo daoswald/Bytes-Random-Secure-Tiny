@@ -13,7 +13,6 @@ use Fcntl;
 use Carp qw/croak/;
 
 ## no critic (constant)
-
 our $VERSION = '1.007';
 use constant UINT32_SIZE => 4;
 
@@ -25,7 +24,6 @@ sub new {
     my $self = {};
     my @methodlist
         = ( \&_try_win32, \&_try_egd, \&_try_dev_random, \&_try_dev_urandom );
-
     foreach my $m (@methodlist) {
         my ($name, $rsub, $isblocking, $isstrong) = $m->();
         next unless defined $name;
@@ -77,13 +75,11 @@ sub _try_win32 {
     return unless $^O eq 'MSWin32';
     eval { require Win32; require Win32::API; require Win32::API::Type; 1; }
         or return;
-
     use constant CRYPT_SILENT      => 0x40;       # Never display a UI.
     use constant PROV_RSA_FULL     => 1;          # Which service provider.
     use constant VERIFY_CONTEXT    => 0xF0000000; # Don't need existing keepairs
     use constant W2K_MAJOR_VERSION => 5;          # Windows 2000
     use constant W2K_MINOR_VERSION => 0;
-
     my ($major, $minor) = (Win32::GetOSVersion())[1, 2];
     return if $major < W2K_MAJOR_VERSION;
 
@@ -201,12 +197,9 @@ sub new {
     my ($class, @seed) = @_;
     my $seedsize = scalar(@seed);
     my @mm;
-
     $#mm = $#seed = 255;                # predeclare arrays with 256 slots
     $seed[$_] = 0 for $seedsize .. 255; # Zero-fill unused seed space.
-
     my $self = [ \@seed, 0, \@mm, 0, 0, 0 ];
-
     bless $self, $class;
     $self->_randinit;
     return $self;
@@ -226,11 +219,9 @@ sub irand {
 sub _isaac {
     my $self = shift;
     use integer;
-
     my($mm, $r, $aa) = @{$self}[randmem,randrsl,randa];
     my $bb = ($self->[randb] + (++$self->[randc])) & 0xffffffff;
     my ($x, $y); # temporary storage
-
     for (my $i = 0; $i < 256; $i += 4) {
         $x = $mm->[$i  ];
         $aa = (($aa ^ ($aa << 13)) + $mm->[($i   + 128) & 0xff]);
@@ -256,7 +247,6 @@ sub _isaac {
         $mm->[$i+3] = $y = ($mm->[($x >> 2) & 0xff] + $aa + $bb) & 0xffffffff;
         $r->[$i+3] = $bb = ($mm->[($y >> 10) & 0xff] + $x) & 0xffffffff;
     }
-
     @{$self}[randb, randa] = ($bb,$aa);
     return;
 }
@@ -264,10 +254,8 @@ sub _isaac {
 sub _randinit {
     my $self = shift;
     use integer;
-
     my ($c, $d, $e, $f, $g, $h, $j, $k) = (0x9e3779b9)x8; # The golden ratio.
     my ($mm, $r) = @{$self}[randmem,randrsl];
-
     for (1..4) {
         $c ^= $d << 11;                     $f += $c;       $d += $e;
         $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
@@ -278,13 +266,11 @@ sub _randinit {
         $j ^= $k << 8;                      $d += $j;       $k += $c;
         $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
     }
-
     for (my $i = 0; $i < 256; $i += 8) {
         $c += $r->[$i  ];   $d += $r->[$i+1];
         $e += $r->[$i+2];   $f += $r->[$i+3];
         $g += $r->[$i+4];   $h += $r->[$i+5];
         $j += $r->[$i+6];   $k += $r->[$i+7];
-
         $c ^= $d << 11;                     $f += $c;       $d += $e;
         $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
         $e ^= $f << 8;                      $h += $e;       $f += $g;
@@ -293,19 +279,16 @@ sub _randinit {
         $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
         $j ^= $k << 8;                      $d += $j;       $k += $c;
         $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
-
         $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
         $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
         $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
         $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
     }
-
     for (my $i = 0; $i < 256; $i += 8) {
         $c += $mm->[$i  ];  $d += $mm->[$i+1];
         $e += $mm->[$i+2];  $f += $mm->[$i+3];
         $g += $mm->[$i+4];  $h += $mm->[$i+5];
         $j += $mm->[$i+6];  $k += $mm->[$i+7];
-
         $c ^= $d << 11;                     $f += $c;       $d += $e;
         $d ^= 0x3fffffff & ($e >> 2);       $g += $d;       $e += $f;
         $e ^= $f << 8;                      $h += $e;       $f += $g;
@@ -314,13 +297,11 @@ sub _randinit {
         $h ^= 0x0fffffff & ($j >> 4);       $c += $h;       $j += $k;
         $j ^= $k << 8;                      $d += $j;       $k += $c;
         $k ^= 0x007fffff & ($c >> 9);       $e += $k;       $c += $d;
-
         $mm->[$i  ] = $c;   $mm->[$i+1] = $d;
         $mm->[$i+2] = $e;   $mm->[$i+3] = $f;
         $mm->[$i+4] = $g;   $mm->[$i+5] = $h;
         $mm->[$i+6] = $j;   $mm->[$i+7] = $k;
     }
-
     $self->_isaac;
     $self->[randcnt] = 256;
     return;
@@ -422,6 +403,7 @@ sub string_from {
 sub shuffle {
     my($self, $aref) = @_;
     croak 'Argument must be an array reference.' unless 'ARRAY' eq ref $aref;
+    return $aref unless @$aref;
     for (my $i = @$aref; --$i;) {
         my $r = $self->_ranged_randoms($i+1, 1)->[0];
         ($aref->[$i],$aref->[$r]) = ($aref->[$r], $aref->[$i]);
@@ -433,7 +415,6 @@ sub _ranged_randoms {
     my ($self, $range, $count) = @_;
     $_ = defined $_ ? $_ : 0 for $count, $range;
     croak "$range exceeds irand max limit of 2^^32." if $range > 2**32;
-
     # Find nearest factor of 2**32 >= $range.
     my $divisor = do {
         my ($n, $d) = (0,0);
@@ -442,7 +423,6 @@ sub _ranged_randoms {
     };
     my @randoms;
     $#randoms = $count-1; @randoms = (); # Microoptimize: Preextend & purge.
-
     for my $n (1 .. $count) { # re-roll if r-num is out of bag range (modbias)
         my $rand = $self->irand % $divisor;
         $rand    = $self->irand % $divisor while $rand >= $range;
