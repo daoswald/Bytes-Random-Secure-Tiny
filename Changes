@@ -1,5 +1,8 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.008 2015-07-08
+  - Shuffle handles empty arrayrefs more gracefully.
+
 1.007 2015-07-07
   - Added a shuffle method.
   - Documentation tweaks.
