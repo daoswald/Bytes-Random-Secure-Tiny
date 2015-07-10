@@ -411,6 +411,16 @@ sub shuffle {
     return $aref;
 }
 
+sub pfshuffle {
+    my $deck = shift;  # $deck is a reference to an array
+    return unless @$deck; # must not be empty!
+    my $i = @$deck;
+    while (--$i) {
+        my $j = int rand ($i+1);
+        @$deck[$i,$j] = @$deck[$j,$i];
+    }
+}
+
 sub _ranged_randoms {
     my ($self, $range, $count) = @_;
     $_ = defined $_ ? $_ : 0 for $count, $range;
