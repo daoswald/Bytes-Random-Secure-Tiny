@@ -109,9 +109,7 @@ inclusive, and must satisfy C<bits==2**n>. The default value is 256.
 
 If set to a false value, a blocking entropy source may be used in seeding. This
 is generally not necessary, as the non-blocking sources used are considered by 
-most to be strong enough for cryptographic purposes. But for extremely
-sensitive purposes, or in environments where the blocking entropy sources are
-supported by hardware entropy generators, this option may be useful.
+most to be strong enough for cryptographic purposes.
 
 Instantiating with a blocking source can exhaust system entropy (this has been
 seen in testing), and in such cases C<new> will block until sufficient entropy
@@ -278,9 +276,15 @@ bytes will only double.
 
 No special requirements.
 
+=head1 SEE ALSO
+
+If support for hardware entropy generators is needed, use
+L<Bytes::Random::Secure>. Other good CSPRNG's include L<Crypt::Random> and
+L<Math::Random::Secure>.
+
 =head1 AUTHOR
 
-David Oswald C<< <davido [at] cpan (dot) org> >>
+David Oswald I<< <davido@cpan.org> >>
 
 =head1 BUGS
 

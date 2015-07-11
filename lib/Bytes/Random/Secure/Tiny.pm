@@ -23,7 +23,7 @@ sub new {
         = defined $params{nonblocking} ? $params{nonblocking} : 1;
     my $self = {};
     my @methodlist
-        = ( \&_try_win32, \&_try_egd, \&_try_dev_random, \&_try_dev_urandom );
+        = ( \&_try_win32, \&_try_dev_random, \&_try_dev_urandom );
     foreach my $m (@methodlist) {
         my ($name, $rsub, $isblocking, $isstrong) = $m->();
         next unless defined $name;
@@ -123,56 +123,6 @@ _RTLGENRANDOM_PROTO_
             }, 0, 1);  # Assume non-blocking and strong
     }
     return;
-}
-
-sub _try_egd {
-    my @devices
-        = qw(/var/run/egd-pool /dev/egd-pool /etc/egd-pool /etc/entropy);
-    foreach my $device (@devices) {
-        next unless -r $device && -S $device;
-        eval { require IO::Socket; 1; } or return;
-        my $socket = IO::Socket::UNIX->new(Peer => $device, Timeout => 1);
-        next unless $socket;
-        $socket->syswrite( pack("C", 0x00), 1) or next;
-        die if $socket->error;
-        my($entropy_string, $nread);
-        eval {
-            local $SIG{ALRM} = sub { die "alarm\n" };
-            alarm 1;
-            $nread = $socket->sysread($entropy_string, 4);
-            alarm 0;
-        };
-        if ($@) {
-            die unless $@ eq "alarm\n";
-            next;
-        }
-        next unless defined $nread && $nread == 4;
-        my $entropy_avail = unpack("N", $entropy_string);
-        return ('EGD', sub { __read_egd($device, @_); }, 1, 1);
-    }
-    return;
-}
-
-sub __read_egd {
-    my ($device, $nbytes) = @_;
-    return unless defined $device;
-    return unless defined $nbytes && int($nbytes) > 0;
-    croak "$device doesn't exist!" unless -r $device && -S $device;
-    my $socket = IO::Socket::UNIX->new(Peer => $device);
-    croak "Can't talk to EGD on $device. $!" unless $socket;
-    my($s, $buffer, $toread) = ('', '', $nbytes);
-    while ($toread > 0) {
-        my $this_request = ($toread > 255) ? 255 : $toread;
-        $socket->syswrite( pack("CC", 0x02, $this_request), 2);
-        my $this_grant = $socket->sysread($buffer, $this_request);
-        croak "Error reading EDG data from $device: $!\n"
-            unless defined $this_grant && $this_grant == $this_request;
-        $s .= $buffer;
-        $toread -= length($buffer);
-    }
-    croak "Internal EGD read error: wanted $nbytes, read ", length($s), ""
-        unless $nbytes == length($s);  # assert
-    return $s;
 }
 
 1;
