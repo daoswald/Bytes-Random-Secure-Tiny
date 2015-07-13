@@ -2,6 +2,8 @@ Revision history for Bytes::Random::Secure::Tiny
 
 1.008 2015-07-08
   - Shuffle handles empty arrayrefs more gracefully.
+  - Removed EGD support; use Bytes::Random::Secure if you need such
+    advanced support.
 
 1.007 2015-07-07
   - Added a shuffle method.
