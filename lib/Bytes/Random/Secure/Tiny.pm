@@ -346,7 +346,8 @@ sub string_from {
     my $range      = length $bag;
     croak 'Bag size must be at least one character.' unless $range;
     my $rand_bytes = q{}; # We need an empty, defined string.
-    $rand_bytes .= substr $bag, $_, 1 for @{$self->_ranged_randoms($range, $bytes)};
+    $rand_bytes .= substr $bag, $_, 1
+        for @{$self->_ranged_randoms($range, $bytes)};
     return $rand_bytes;
 }
 
