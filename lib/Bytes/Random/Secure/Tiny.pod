@@ -158,7 +158,7 @@ C<< 0 <= x <= 2**32-1 >>.
 
     my $aref_shuffled = $random->shuffle($aref);
 
-Shuffles the contents of a reference to an array in sitiu, and returns
+Shuffles the contents of a reference to an array in situ, and returns
 the same reference.
 
 L<List::Util>, which ships with Perl, includes C<shuffle> function. But that
