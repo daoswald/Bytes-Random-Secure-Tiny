@@ -13,7 +13,7 @@ use Fcntl;
 use Carp qw/croak/;
 
 ## no critic (constant)
-our $VERSION = '1.008';
+our $VERSION = '1.009';
 use constant UINT32_SIZE => 4;
 
 sub new {

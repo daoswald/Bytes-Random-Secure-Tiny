@@ -44,6 +44,6 @@
          "web" : "https://github.com/daoswald/Bytes-Random-Secure-Tiny"
       }
    },
-   "version" : "1.008",
+   "version" : "1.009",
    "x_serialization_backend" : "JSON::PP version 4.05"
 }
