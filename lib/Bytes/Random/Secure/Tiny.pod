@@ -9,7 +9,7 @@ cryptographically-secure random bytes.
 
     use Bytes::Random::Secure::Tiny;
 
-    my $rng = Bytes::Random::Secure->new; # Seed with 256 bits.
+    my $rng = Bytes::Random::Secure::Tiny->new; # Seed with 256 bits.
 
     my $bytes  = $rng->bytes(32);              # A string of 32 random bytes.
     my $long   = $rng->irand;                  # 32-bit random unsigned int.
