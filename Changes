@@ -1,5 +1,8 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.010 2020-09-25
+  - Version numbers consistency.
+
 1.009 2020-09-24
   - Fixed a spelling error and SYNOPSIS error in POD (Patches received via GitHub PRs).
 
