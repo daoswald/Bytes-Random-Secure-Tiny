@@ -1,7 +1,7 @@
 # Version control files and dirs.
-^.git/\b
-^.gitignore$
-^.perltidyrc
+^\.git/\b
+^\.gitignore$
+^\.perltidyrc
 
 # Makemaker generated files and dirs.
 ^MANIFEST\.

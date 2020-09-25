@@ -1,5 +1,10 @@
 Revision history for Bytes::Random::Secure::Tiny
 
+1.011 2020-09-25
+  - Add version number tests.
+  - Move author tests to xt/
+  - Eliminate dependency on Test::CheckManifest: Module is broken and author seems unlikely to fix it.
+
 1.010 2020-09-25
   - Version numbers consistency.
 
